@@ -1,0 +1,21 @@
+[package]
+name = "guess-the-game-exchanger"
+version = "0.1.0"
+authors = ["Perjéssy Lóránt <lostlont@lostlont.hu>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace]
+members = [
+	"firefox/app",
+	"firefox/core",
+	"firefox/core-tests",
+]
+
+[dependencies]
+#core = { path = "firefox/core" }
+
+[[bin]]
+name = "guess-the-game-exchanger"
+path = "firefox/app/src/main.rs"
