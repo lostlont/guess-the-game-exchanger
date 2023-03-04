@@ -8,14 +8,11 @@ edition = "2021"
 
 [workspace]
 members = [
-	"firefox/app",
-	"firefox/core",
-	"firefox/core-tests",
+	"crates/app",
+	"crates/core",
+	"crates/core-tests",
 ]
-
-[dependencies]
-#core = { path = "firefox/core" }
 
 [[bin]]
 name = "guess-the-game-exchanger"
-path = "firefox/app/src/main.rs"
+path = "crates/app/src/main.rs"
