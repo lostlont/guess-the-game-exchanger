@@ -5,9 +5,12 @@ use iced::
 };
 
 mod app;
+mod app_message;
 mod browser;
-mod message;
 use app::App;
+
+pub const PADDING: u16 = 8;
+pub const SPACING: u16 = PADDING;
 
 pub fn main() -> iced::Result
 {
