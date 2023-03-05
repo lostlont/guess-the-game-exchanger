@@ -83,11 +83,13 @@ impl App
 {
 	fn view_firefox<'a>() -> Element<'a, Message>
 	{
-		// TODO Import message
-		App::view_browser("Firefox", Message::ExportFromFirefox, Message::ExportFromFirefox)
+		App::view_browser(
+			"Firefox",
+			Some(Message::ExportFromFirefox),
+			None)
 	}
 
-	fn view_browser<'a>(browser_name: &str, export_message: Message, import_message: Message) -> Element<'a, Message>
+	fn view_browser<'a>(browser_name: &str, export_message: Option<Message>, import_message: Option<Message>) -> Element<'a, Message>
 	{
 		let export_button = App::view_browser_button(&format!("Export from {browser_name}"), export_message);
 		let import_button = App::view_browser_button(&format!("Import into {browser_name}"), import_message);
@@ -97,7 +99,7 @@ impl App
 			.into()
 	}
 
-	fn view_browser_button<'a>(button_text: &str, message: Message) -> Element<'a, Message>
+	fn view_browser_button<'a>(button_text: &str, message: Option<Message>) -> Element<'a, Message>
 	{
 		let button_text = text(button_text)
 			.width(Length::Fill)
@@ -105,8 +107,16 @@ impl App
 			.vertical_alignment(Vertical::Center);
 		let button = button(button_text)
 			.width(Length::Fill)
-			.height(32)
-			.on_press(message);
+			.height(32);
+
+		let button = if let Some(message) = message
+		{
+			button.on_press(message)
+		}
+		else
+		{
+			button
+		};
 
 		button.into()
 	}
