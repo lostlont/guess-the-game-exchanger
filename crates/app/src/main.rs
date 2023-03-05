@@ -5,6 +5,7 @@ use iced::
 };
 
 mod app;
+mod browser;
 mod message;
 use app::App;
 

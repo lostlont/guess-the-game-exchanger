@@ -1,23 +1,28 @@
-use iced::
+use
 {
-	alignment::
+	std::fs::File,
+	iced::
 	{
-		Horizontal,
-		Vertical,
+		alignment::
+		{
+			Horizontal,
+			Vertical,
+		},
+		widget::
+		{
+			self,
+			button,
+			row,
+			text,
+		},
+		Alignment,
+		Element,
+		Length,
+		Sandbox,
 	},
-	widget::
-	{
-		self,
-		button,
-		row,
-		text,
-	},
-	Alignment,
-	Element,
-	Length,
-	Sandbox,
+	configparser::ini::Ini,
+	crate::message::Message,
 };
-use crate::message::Message;
 
 pub struct App
 {
@@ -48,29 +53,22 @@ impl Sandbox for App
 	{
 		match message
 		{
-			Message::ExportFromFirefox => self.is_exporting = true,
+			Message::ExportFromFirefox =>
+			{
+				let config_dir = dirs::config_dir();
+				println!("Config dir: {config_dir:?}");
+				//File::open("")
+				//let mut ini = Ini::new();
+				//ini.read(ini_content);
+				self.is_exporting = true
+			}
 		}
 	}
 
 	fn view(&self) -> Element<Self::Message>
 	{
 		let firefox = App::view_firefox();
-
-		let exporting_label = text("Exporting...")
-			.width(Length::Fill)
-			.size(36)
-			.horizontal_alignment(Horizontal::Center);
-
-		let result = if self.is_exporting
-		{
-			widget::column![firefox, exporting_label]
-		}
-		else
-		{
-			widget::column![firefox]
-		};
-
-		result
+		widget::column![firefox]
 			.width(Length::Fill)
 			.align_items(Alignment::Center)
 			.spacing(SPACING)

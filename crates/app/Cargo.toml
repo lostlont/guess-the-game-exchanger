@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 iced = "0.8.0"
+dirs = "4.0.0"
+configparser = "3.0.2"
