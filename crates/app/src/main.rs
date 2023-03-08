@@ -1,12 +1,11 @@
 use iced::
 {
-	Sandbox,
+	Application,
 	Settings,
 };
 
 mod app;
 mod app_message;
-mod browser;
 use app::App;
 
 pub const PADDING: u16 = 8;
