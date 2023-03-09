@@ -85,4 +85,4 @@ fn get_profile_dir(ini: &Ini) -> Result<String, String>
 		.ok_or("Default key has no value in the Install section of Firefox profiles!".to_string())?;
 
 	Ok(default_value)
-	}
+}
