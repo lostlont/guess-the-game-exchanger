@@ -1,6 +1,10 @@
 use
 {
-	std::future::Future,
+	std::
+	{
+		fs::File,
+		future::Future,
+	},
 	iced::
 	{
 		alignment::
@@ -98,10 +102,14 @@ impl Application for App
 
 				let entries = browser
 					.as_ref()
-					.export();
+					.export()
+					.unwrap(); // TODO Error handling
 
-				println!("Exporting: {entries:?}");
-				// TODO Export
+				let file = File::create(path)
+					.unwrap(); // TODO Error handling
+				
+				serde_json::to_writer_pretty(file, &entries)
+					.unwrap(); // TODO Error handling
 
 				Command::none()
 			}
