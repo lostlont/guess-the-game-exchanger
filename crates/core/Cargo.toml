@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 dirs = "4.0.0"
 configparser = "3.0.2"
+sqlite = "0.30.4"

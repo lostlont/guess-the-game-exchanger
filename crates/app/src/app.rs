@@ -96,9 +96,12 @@ impl Application for App
 					})
 					.unwrap();
 
-				browser
+				let entries = browser
 					.as_ref()
-					.export(&path);
+					.export();
+
+				println!("Exporting: {entries:?}");
+				// TODO Export
 
 				Command::none()
 			}
@@ -110,6 +113,7 @@ impl Application for App
 			CommandType::Import(path) =>
 			{
 				self.is_enabled = true;
+				// TODO Import
 				Command::none()
 			}
 			CommandType::Cancel =>

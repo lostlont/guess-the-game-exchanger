@@ -4,14 +4,14 @@ use
 	{
 		fs::File,
 		io::Read,
-		path::
-		{
-			Path,
-			PathBuf,
-		}
+		path::PathBuf,
 	},
 	configparser::ini::Ini,
-	crate::browser::Browser,
+	crate::browser::
+	{
+		Browser,
+		Entry,
+	},
 };
 
 pub struct Firefox
@@ -23,12 +23,14 @@ impl Firefox
 {
 	pub fn new() -> Result<Box<dyn Browser>, String>
 	{
-		let profiles_path = get_profiles_path()?;
+		let firefox_dir = get_firefox_dir()?;
+		let profiles_path = firefox_dir.join("profiles.ini");
 		let ini = read_profiles_ini(&profiles_path)?;
 		let profile_dir = get_profile_dir(&ini)?;
-		let profile_path = profiles_path.join(profile_dir);
-		let db_path = profile_path.join("storage/default/https+++guessthe.game/ls/data.sqlite");
-
+		let db_path = firefox_dir
+			.join(&profile_dir)
+			.join("storage/default/https+++guessthe.game/ls/data.sqlite");
+		
 		Ok(Box::new(Firefox
 		{
 			db_path,
@@ -43,20 +45,39 @@ impl Browser for Firefox
 		"Firefox"
 	}
 
-	fn export(&self, path: &Path)
+	fn export(&self) -> Result<Vec<Entry>, String>
 	{
+		let connection = sqlite::open(&self.db_path)
+			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
+
+		let mut statement = connection.prepare("select key, utf16_length, value from data")
+			.or(Err("Could not prepare select statement on database of Firefox!".to_string()))?;
+
+		let entries =  statement
+			.iter()
+			.collect::<Result<Vec<_>, _>>()
+			.or(Err("Could not read a row from the database of Firefox!".to_string()))?
+			.iter()
+			.map(|row| Entry
+				{
+					key: row.read::<&str, _>(0).to_string(),
+					utf16_length: row.read::<i64, _>(1),
+					value: Vec::from(row.read::<&[u8], _>(2)),
+				})
+			.collect::<Vec<_>>();
+
+		Ok(entries)
 	}
 }
 
-fn get_profiles_path() -> Result<PathBuf, String>
+fn get_firefox_dir() -> Result<PathBuf, String>
 {
 	let config_dir = dirs::config_dir();
 	let config_dir = config_dir
-		.ok_or("No config directory is present for Firefox!".to_string())?;
+		.ok_or("No config directory is present!".to_string())?;
+	let firefox_dir = config_dir.join("Mozilla/Firefox");
 
-	let profiles_path = config_dir.join("Mozilla/Firefox/profiles.ini");
-
-	Ok(profiles_path)
+	Ok(firefox_dir)
 }
 
 fn read_profiles_ini(profiles_path: &PathBuf) -> Result<Ini, String>
