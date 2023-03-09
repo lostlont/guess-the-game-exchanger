@@ -3,4 +3,6 @@ pub enum CommandType
 {
 	Export,
 	Import,
+	ExportFinished,
+	ImportFinished,
 }

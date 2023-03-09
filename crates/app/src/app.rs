@@ -1,5 +1,6 @@
 use
 {
+	std::future::Future,
 	iced::
 	{
 		alignment::
@@ -38,6 +39,7 @@ use
 pub struct App
 {
 	components: Vec<Component>,
+	is_enabled: bool,
 }
 
 impl Application for App
@@ -61,6 +63,7 @@ impl Application for App
 							browser: result,
 						}),
 			],
+			is_enabled: true,
 		};
 
 		(result, Command::none())
@@ -77,21 +80,21 @@ impl Application for App
 		{
 			CommandType::Export =>
 			{
-				let path = rfd::FileDialog::new()
-					.add_filter("JSON", &["json"])
-					.save_file();
+				self.is_enabled = false;
 
-				if let Some(path) = path
-				{
-					println!("Picked file: {path:?}");
-				}
+				Command::perform(self.export(message.browser_type), |m| m)
+			}
+			CommandType::ExportFinished =>
+			{
+				self.is_enabled = true;
+				println!("Export finished");
+				Command::none()
 			}
 			_ =>
 			{
+				Command::none()
 			}
 		}
-
-		Command::none()
 	}
 
 	fn view(&self) -> Element<Self::Message>
@@ -99,7 +102,7 @@ impl Application for App
 		let mut result = iced::widget::column![];
 		let component_views = self.components
 			.iter()
-			.map(|c| view_component(c));
+			.map(|c| self.view_component(c));
 		for view in component_views
 		{
 			result = result.push(view);
@@ -113,55 +116,88 @@ impl Application for App
 	}
 }
 
-fn view_component(component: &Component) -> Element<AppMessage>
+impl App
 {
-	match component
+	fn export(&mut self, browser_type: BrowserType) -> impl Future<Output = AppMessage> + 'static
 	{
-		Component::Browser{browser_type, browser} => view_browser(*browser_type, browser.as_ref()),
-		Component::Error(error) => text(error)
-			.width(Length::Fill)
-			.horizontal_alignment(Horizontal::Center)
-			.vertical_alignment(Vertical::Center)
-			.height(32)
+		async move
+		{
+			let path = rfd::AsyncFileDialog::new()
+				.add_filter("JSON", &["json"])
+				.save_file()
+				.await;
+
+			if let Some(path) = path
+			{
+				println!("Picked file: {path:?}");
+			}
+
+			AppMessage
+			{
+				browser_type,
+				command_type: CommandType::ExportFinished,
+			}
+		}
+	}
+
+	fn view_component(&self, component: &Component) -> Element<AppMessage>
+	{
+		match component
+		{
+			Component::Browser{browser_type, browser} => self.view_browser(*browser_type, browser.as_ref()),
+			Component::Error(error) => text(error)
+				.width(Length::Fill)
+				.horizontal_alignment(Horizontal::Center)
+				.vertical_alignment(Vertical::Center)
+				.height(32)
+				.into()
+		}
+	}
+
+	fn view_browser(&self, browser_type: BrowserType, browser: &dyn Browser) -> Element<AppMessage>
+	{
+		let browser_name = browser.name();
+		
+		let export_button = self.view_browser_button(
+			&format!("Export from {browser_name}"),
+			AppMessage
+			{
+				browser_type,
+				command_type: CommandType::Export,
+			});
+
+		let import_button = self.view_browser_button(
+			&format!("Import into {browser_name}"),
+			AppMessage
+			{
+				browser_type,
+				command_type: CommandType::Import,
+			});
+
+		row![export_button, import_button]
+			.spacing(SPACING)
 			.into()
 	}
-}
 
-fn view_browser(browser_type: BrowserType, browser: &dyn Browser) -> Element<AppMessage>
-{
-	let browser_name = browser.name();
-	
-	let export_button = view_browser_button(
-		&format!("Export from {browser_name}"),
-		AppMessage
+	fn view_browser_button<'a>(&self, button_text: &str, message: AppMessage) -> Element<'a, AppMessage>
+	{
+		let button_text = text(button_text)
+			.width(Length::Fill)
+			.horizontal_alignment(Horizontal::Center)
+			.vertical_alignment(Vertical::Center);
+		let button = button(button_text)
+			.width(Length::Fill)
+			.height(32);
+
+		let button = if self.is_enabled
 		{
-			browser_type,
-			command_type: CommandType::Export,
-		});
-
-	let import_button = view_browser_button(
-		&format!("Import into {browser_name}"),
-		AppMessage
+			button.on_press(message)
+		}
+		else
 		{
-			browser_type,
-			command_type: CommandType::Import,
-		});
+			button
+		};
 
-	row![export_button, import_button]
-		.spacing(SPACING)
-		.into()
-}
-
-fn view_browser_button<'a>(button_text: &str, message: AppMessage) -> Element<'a, AppMessage>
-{
-	let button_text = text(button_text)
-		.width(Length::Fill)
-		.horizontal_alignment(Horizontal::Center)
-		.vertical_alignment(Vertical::Center);
-	let button = button(button_text)
-		.width(Length::Fill)
-		.height(32)
-		.on_press(message);
-
-	button.into()
+		button.into()
+	}
 }
