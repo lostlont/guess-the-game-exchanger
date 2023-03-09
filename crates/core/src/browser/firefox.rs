@@ -4,7 +4,11 @@ use
 	{
 		fs::File,
 		io::Read,
-		path::PathBuf,
+		path::
+		{
+			Path,
+			PathBuf,
+		}
 	},
 	configparser::ini::Ini,
 	crate::browser::Browser,
@@ -37,6 +41,10 @@ impl Browser for Firefox
 	fn name(&self) -> &str
 	{
 		"Firefox"
+	}
+
+	fn export(&self, path: &Path)
+	{
 	}
 }
 

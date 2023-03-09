@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 #[derive(Clone, Debug)]
 pub enum CommandType
 {
-	Export,
-	Import,
-	ExportFinished,
-	ImportFinished,
+	AskPathToExport,
+	AskPathToImport,
+	Export(PathBuf),
+	Import(PathBuf),
+	Cancel,
 }

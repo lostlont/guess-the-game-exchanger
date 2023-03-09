@@ -78,20 +78,43 @@ impl Application for App
 	{
 		match message.command_type
 		{
-			CommandType::Export =>
+			CommandType::AskPathToExport =>
 			{
 				self.is_enabled = false;
-
-				Command::perform(self.export(message.browser_type), |m| m)
+				Command::perform(self.ask_path_to_export(message.browser_type), |m| m)
 			}
-			CommandType::ExportFinished =>
+			CommandType::Export(path) =>
 			{
 				self.is_enabled = true;
-				println!("Export finished");
+				let _bt = message.browser_type;
+				let browser = self.components
+					.iter()
+					.find_map(|c| match c
+					{
+						Component::Browser{browser_type: _bt, browser} => Some(browser),
+						Component::Error(_) => None,
+					})
+					.unwrap();
+
+				browser
+					.as_ref()
+					.export(&path);
+
 				Command::none()
 			}
-			_ =>
+			CommandType::AskPathToImport =>
 			{
+				self.is_enabled = false;
+				Command::perform(self.ask_path_to_import(message.browser_type), |m| m)
+			}
+			CommandType::Import(path) =>
+			{
+				self.is_enabled = true;
+				Command::none()
+			}
+			CommandType::Cancel =>
+			{
+				self.is_enabled = true;
 				Command::none()
 			}
 		}
@@ -118,7 +141,7 @@ impl Application for App
 
 impl App
 {
-	fn export(&mut self, browser_type: BrowserType) -> impl Future<Output = AppMessage> + 'static
+	fn ask_path_to_export(&self, browser_type: BrowserType) -> impl Future<Output = AppMessage> + 'static
 	{
 		async move
 		{
@@ -127,15 +150,45 @@ impl App
 				.save_file()
 				.await;
 
-			if let Some(path) = path
+			let command_type = if let Some(path) = path
 			{
-				println!("Picked file: {path:?}");
+				CommandType::Export(path.into())
 			}
+			else
+			{
+				CommandType::Cancel
+			};
 
 			AppMessage
 			{
 				browser_type,
-				command_type: CommandType::ExportFinished,
+				command_type,
+			}
+		}
+	}
+
+	fn ask_path_to_import(&self, browser_type: BrowserType) -> impl Future<Output = AppMessage> + 'static
+	{
+		async move
+		{
+			let path = rfd::AsyncFileDialog::new()
+				.add_filter("JSON", &["json"])
+				.pick_file()
+				.await;
+
+			let command_type = if let Some(path) = path
+			{
+				CommandType::Import(path.into())
+			}
+			else
+			{
+				CommandType::Cancel
+			};
+
+			AppMessage
+			{
+				browser_type,
+				command_type,
 			}
 		}
 	}
@@ -163,7 +216,7 @@ impl App
 			AppMessage
 			{
 				browser_type,
-				command_type: CommandType::Export,
+				command_type: CommandType::AskPathToExport,
 			});
 
 		let import_button = self.view_browser_button(
@@ -171,7 +224,7 @@ impl App
 			AppMessage
 			{
 				browser_type,
-				command_type: CommandType::Import,
+				command_type: CommandType::AskPathToImport,
 			});
 
 		row![export_button, import_button]
