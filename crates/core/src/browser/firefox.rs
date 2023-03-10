@@ -2,11 +2,16 @@ use
 {
 	std::
 	{
-		fs::File,
+		fs::
+		{
+			self,
+			File,
+		},
 		io::Read,
 		path::PathBuf,
 	},
 	configparser::ini::Ini,
+	sqlite::Value,
 	crate::browser::
 	{
 		Browser,
@@ -84,6 +89,45 @@ impl Browser for Firefox
 			.collect::<Vec<_>>();
 
 		Ok(entries)
+	}
+
+	fn import(&self, entries: Vec<Entry>) -> Result<(), String>
+	{
+		let backup_path = self.db_path.with_extension("bck");
+		fs::copy(&self.db_path, &backup_path)
+			.or(Err("Could not back up storage database of Firefox!".to_string()))?;
+
+		let connection = sqlite::open(&self.db_path)
+			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
+
+		let mut delete_statement = connection.prepare("delete from data")
+			.or(Err("Could not prepare delete statement on database of Firefox!".to_string()))?;
+
+		delete_statement
+			.iter()
+			.collect::<Result<Vec<_>, _>>()
+			.or(Err("Could not delete rows from the database of Firefox!".to_string()))?;
+
+		for entry in entries
+		{
+			let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
+				.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
+
+			let parameters = [
+				(":key", entry.key.into()),
+				(":utf16_length", entry.utf16_length.into()),
+				(":value", entry.value.into()),
+			];
+			insert_statement.bind::<&[(_, Value)]>(&parameters[..])
+				.or(Err("Could not bind parameters to statement in insert statement on database of Firefox!"))?;
+
+			insert_statement
+				.iter()
+				.collect::<Result<Vec<_>, _>>()
+				.or(Err("Could not insert rows into the database of Firefox!".to_string()))?;
+		}
+
+		Ok(())
 	}
 }
 

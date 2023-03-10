@@ -126,7 +126,14 @@ impl Application for App
 			}
 			CommandType::Import(path) =>
 			{
-				// TODO Import
+				let browser = self.get_browser(message.browser_type);
+				let import = self.import(browser, &path);
+				let import_message = match import
+				{
+					Ok(()) => BrowserMessage::Success("Success!".to_string()),
+					Err(error) => BrowserMessage::Failure(error),
+				};
+				self.set_browser_message(message.browser_type, import_message);
 				self.is_enabled = true;
 				Command::none()
 			}
@@ -237,7 +244,20 @@ impl App
 			.or(Err("Could not create file for exporting at the selected path!".to_string()))?;
 		
 		serde_json::to_writer_pretty(file, &entries)
-			.or(Err("Could not write JSON to the file selected!".to_string()))?;
+			.or(Err("Could not write JSON to the selected file!".to_string()))?;
+
+		Ok(())
+	}
+
+	fn import(&self, browser: &dyn Browser, path: &Path) -> Result<(), String>
+	{
+		let file = File::open(path)
+			.or(Err("Could not open file for importing at the selected path!".to_string()))?;
+
+		let entries = serde_json::from_reader(file)
+			.or(Err("Could not read JSON from the selected file!".to_string()))?;
+
+		browser.import(entries)?;
 
 		Ok(())
 	}
