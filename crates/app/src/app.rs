@@ -21,6 +21,7 @@ use
 			text,
 		},
 		Application,
+		Color,
 		Command,
 		Element,
 		Length,
@@ -33,6 +34,7 @@ use
 	crate::
 	{
 		app_message::AppMessage,
+		browser_message::BrowserMessage,
 		browser_state::BrowserState,
 		browser_type::BrowserType,
 		command_type::CommandType,
@@ -68,13 +70,13 @@ impl Application for App
 					{
 						browser_type,
 						browser: Some(browser),
-						message: None,
+						message: BrowserMessage::Empty,
 					}),
 					Err(error) => Some(BrowserState
 					{
 						browser_type,
 						browser: None,
-						message: Some(error),
+						message: BrowserMessage::Failure(error),
 					}),
 				})
 			.collect();
@@ -100,22 +102,26 @@ impl Application for App
 			CommandType::AskPathToExport =>
 			{
 				self.is_enabled = false;
+				self.set_browser_message(message.browser_type, BrowserMessage::Empty);
 				Command::perform(self.ask_path_to_export(message.browser_type), |m| m)
 			}
 			CommandType::Export(path) =>
 			{
 				let browser = self.get_browser(message.browser_type);
 				let export = self.export(browser, &path);
-				if let Err(error) = export
+				let export_message = match export
 				{
-					self.set_browser_message(message.browser_type, Some(error));
-				}
+					Ok(()) => BrowserMessage::Success("Success!".to_string()),
+					Err(error) => BrowserMessage::Failure(error),
+				};
+				self.set_browser_message(message.browser_type, export_message);
 				self.is_enabled = true;
 				Command::none()
 			}
 			CommandType::AskPathToImport =>
 			{
 				self.is_enabled = false;
+				self.set_browser_message(message.browser_type, BrowserMessage::Empty);
 				Command::perform(self.ask_path_to_import(message.browser_type), |m| m)
 			}
 			CommandType::Import(path) =>
@@ -213,7 +219,7 @@ impl App
 			.as_ref()
 	}
 
-	fn set_browser_message(&mut self, browser_type: BrowserType, message: Option<String>)
+	fn set_browser_message(&mut self, browser_type: BrowserType, message: BrowserMessage)
 	{
 		let mut browser_state = self.browser_states
 			.iter_mut()
@@ -245,10 +251,7 @@ impl App
 			result = result.push(self.view_browser(browser_state.browser_type, browser.as_ref()));
 		}
 
-		if let Some(message) = &browser_state.message
-		{
-			result = result.push(self.view_message(&message));
-		}
+		result = result.push(self.view_message(&browser_state.message));
 
 		result.into()
 	}
@@ -300,13 +303,25 @@ impl App
 		button.into()
 	}
 
-	fn view_message(&self, message: &str) -> Element<AppMessage>
+	fn view_message(&self, message: &BrowserMessage) -> Element<AppMessage>
 	{
-		text(message)
+		let content = match message
+		{
+			BrowserMessage::Empty => "",
+			BrowserMessage::Success(message) => message,
+			BrowserMessage::Failure(message) => message,
+		};
+		let color = match message
+		{
+			BrowserMessage::Failure(_) => Color::from_rgb8(255, 0, 0),
+			_ => Color::from_rgb8(0, 0, 0),
+		};
+		text(content)
 			.width(Length::Fill)
 			.horizontal_alignment(Horizontal::Center)
 			.vertical_alignment(Vertical::Center)
 			.height(32)
+			.style(color)
 			.into()
 }
 }

@@ -6,6 +6,7 @@ use iced::
 
 mod app;
 mod app_message;
+mod browser_message;
 mod browser_state;
 mod browser_type;
 mod command_type;
