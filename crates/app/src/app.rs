@@ -147,7 +147,13 @@ impl Application for App
 
 	fn view(&self) -> Element<Self::Message>
 	{
-		let mut result = iced::widget::column![];
+		let title = text("Guess The Game Exchanger")
+			.width(Length::Fill)
+			.size(24)
+			.horizontal_alignment(Horizontal::Center);
+		let mut result = iced::widget::column![
+			title,
+		];
 		for view in self.browser_states
 			.iter()
 			.map(|bs| self.view_browser_state(bs))
@@ -157,8 +163,8 @@ impl Application for App
 		result
 			.width(Length::Fill)
 			.align_items(Alignment::Center)
-			.spacing(SPACING)
-			.padding(PADDING)
+			.spacing(SPACING * 4)
+			.padding(PADDING * 4)
 			.into()
 	}
 }
@@ -278,10 +284,13 @@ impl App
 
 	fn view_browser(&self, browser_type: BrowserType, browser: &dyn Browser) -> Element<AppMessage>
 	{
-		let browser_name = browser.name();
+		let browser_name = text(browser.name())
+			.width(Length::Fill)
+			.size(20)
+			.horizontal_alignment(Horizontal::Center);
 		
 		let export_button = self.view_browser_button(
-			&format!("Export from {browser_name}"),
+			"Export",
 			AppMessage
 			{
 				browser_type,
@@ -289,14 +298,17 @@ impl App
 			});
 
 		let import_button = self.view_browser_button(
-			&format!("Import into {browser_name}"),
+			"Import",
 			AppMessage
 			{
 				browser_type,
 				command_type: CommandType::AskPathToImport,
 			});
 
-		row![export_button, import_button]
+		iced::widget::column![
+			browser_name,
+			row![export_button, import_button].spacing(SPACING),
+		]
 			.spacing(SPACING)
 			.into()
 	}
