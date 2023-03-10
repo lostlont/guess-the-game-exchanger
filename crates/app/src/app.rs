@@ -32,9 +32,9 @@ use
 	crate::
 	{
 		app_message::AppMessage,
+		browser_state::BrowserState,
 		browser_type::BrowserType,
 		command_type::CommandType,
-		component::Component,
 		PADDING,
 		SPACING,
 	},
@@ -42,7 +42,7 @@ use
 
 pub struct App
 {
-	components: Vec<Component>,
+	browser_states: Vec<BrowserState>,
 	is_enabled: bool,
 }
 
@@ -55,18 +55,32 @@ impl Application for App
 
 	fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>)
 	{
+		let browsers = vec![
+			(BrowserType::Firefox, Firefox::try_new()),
+		];
+		let browser_states = browsers
+			.into_iter()
+			.filter_map(|(browser_type, browser)| match browser
+				{
+					Ok(None) => None,
+					Ok(Some(browser)) => Some(BrowserState
+					{
+						browser_type,
+						browser: Some(browser),
+						message: None,
+					}),
+					Err(error) => Some(BrowserState
+					{
+						browser_type,
+						browser: None,
+						message: Some(error),
+					}),
+				})
+			.collect();
+
 		let result = Self
 		{
-			components: vec![
-				Firefox::new()
-					.map_or_else(
-						|error| Component::Error(error),
-						|result| Component::Browser
-						{
-							browser_type: BrowserType::Firefox,
-							browser: result,
-						}),
-			],
+			browser_states,
 			is_enabled: true,
 		};
 
@@ -91,13 +105,9 @@ impl Application for App
 			{
 				self.is_enabled = true;
 				let _bt = message.browser_type;
-				let browser = self.components
+				let browser = self.browser_states
 					.iter()
-					.find_map(|c| match c
-					{
-						Component::Browser{browser_type: _bt, browser} => Some(browser),
-						Component::Error(_) => None,
-					})
+					.find_map(|bs| if bs.browser_type == _bt { Some(bs.browser.as_ref().unwrap()) } else { None })
 					.unwrap();
 
 				let entries = browser
@@ -135,10 +145,9 @@ impl Application for App
 	fn view(&self) -> Element<Self::Message>
 	{
 		let mut result = iced::widget::column![];
-		let component_views = self.components
+		for view in self.browser_states
 			.iter()
-			.map(|c| self.view_component(c));
-		for view in component_views
+			.map(|bs| self.view_browser_state(bs))
 		{
 			result = result.push(view);
 		}
@@ -205,18 +214,21 @@ impl App
 		}
 	}
 
-	fn view_component(&self, component: &Component) -> Element<AppMessage>
+	fn view_browser_state(&self, browser_state: &BrowserState) -> Element<AppMessage>
 	{
-		match component
+		let mut result = iced::widget::column![];
+
+		if let Some(browser) = &browser_state.browser
 		{
-			Component::Browser{browser_type, browser} => self.view_browser(*browser_type, browser.as_ref()),
-			Component::Error(error) => text(error)
-				.width(Length::Fill)
-				.horizontal_alignment(Horizontal::Center)
-				.vertical_alignment(Vertical::Center)
-				.height(32)
-				.into()
+			result = result.push(self.view_browser(browser_state.browser_type, browser.as_ref()));
 		}
+
+		if let Some(message) = &browser_state.message
+		{
+			result = result.push(self.view_message(&message));
+		}
+
+		result.into()
 	}
 
 	fn view_browser(&self, browser_type: BrowserType, browser: &dyn Browser) -> Element<AppMessage>
@@ -265,4 +277,14 @@ impl App
 
 		button.into()
 	}
+
+	fn view_message(&self, message: &str) -> Element<AppMessage>
+	{
+		text(message)
+			.width(Length::Fill)
+			.horizontal_alignment(Horizontal::Center)
+			.vertical_alignment(Vertical::Center)
+			.height(32)
+			.into()
+}
 }

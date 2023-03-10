@@ -21,20 +21,37 @@ pub struct Firefox
 
 impl Firefox
 {
-	pub fn new() -> Result<Box<dyn Browser>, String>
+	pub fn try_new() -> Result<Option<Box<dyn Browser>>, String>
 	{
 		let firefox_dir = get_firefox_dir()?;
-		let profiles_path = firefox_dir.join("profiles.ini");
-		let ini = read_profiles_ini(&profiles_path)?;
-		let profile_dir = get_profile_dir(&ini)?;
-		let db_path = firefox_dir
-			.join(&profile_dir)
-			.join("storage/default/https+++guessthe.game/ls/data.sqlite");
-		
-		Ok(Box::new(Firefox
+
+		let result = if let Some(firefox_dir) = firefox_dir
 		{
-			db_path,
-		}))
+			let profiles_path = firefox_dir.join("profiles.ini");
+			let ini = read_profiles_ini(&profiles_path)?;
+			let profile_dir = get_profile_dir(&ini)?;
+			let db_path = firefox_dir
+				.join(&profile_dir)
+				.join("storage/default/https+++guessthe.game/ls/data.sqlite");
+
+			if !db_path.exists()
+			{
+				return Err("Could not find profiles file of Firefox!".to_string());
+			}
+			
+			let firefox: Box<dyn Browser> = Box::new(Firefox
+			{
+				db_path,
+			});
+
+			Some(firefox)
+		}
+		else
+		{
+			None
+		};
+
+		Ok(result)
 	}
 }
 
@@ -70,14 +87,22 @@ impl Browser for Firefox
 	}
 }
 
-fn get_firefox_dir() -> Result<PathBuf, String>
+fn get_firefox_dir() -> Result<Option<PathBuf>, String>
 {
 	let config_dir = dirs::config_dir();
 	let config_dir = config_dir
 		.ok_or("No config directory is present!".to_string())?;
 	let firefox_dir = config_dir.join("Mozilla/Firefox");
 
-	Ok(firefox_dir)
+	let result = if firefox_dir.exists()
+	{
+		Some(firefox_dir)
+	}
+	else
+	{
+		None
+	};
+	Ok(result)
 }
 
 fn read_profiles_ini(profiles_path: &PathBuf) -> Result<Ini, String>

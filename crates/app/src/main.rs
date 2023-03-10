@@ -6,9 +6,9 @@ use iced::
 
 mod app;
 mod app_message;
+mod browser_state;
 mod browser_type;
 mod command_type;
-mod component;
 use app::App;
 
 pub const PADDING: u16 = 8;
