@@ -4,6 +4,7 @@ use
 	{
 		fs::File,
 		future::Future,
+		path::Path,
 	},
 	iced::
 	{
@@ -103,24 +104,13 @@ impl Application for App
 			}
 			CommandType::Export(path) =>
 			{
+				let browser = self.get_browser(message.browser_type);
+				let export = self.export(browser, &path);
+				if let Err(error) = export
+				{
+					self.set_browser_message(message.browser_type, Some(error));
+				}
 				self.is_enabled = true;
-				let _bt = message.browser_type;
-				let browser = self.browser_states
-					.iter()
-					.find_map(|bs| if bs.browser_type == _bt { Some(bs.browser.as_ref().unwrap()) } else { None })
-					.unwrap();
-
-				let entries = browser
-					.as_ref()
-					.export()
-					.unwrap(); // TODO Error handling
-
-				let file = File::create(path)
-					.unwrap(); // TODO Error handling
-				
-				serde_json::to_writer_pretty(file, &entries)
-					.unwrap(); // TODO Error handling
-
 				Command::none()
 			}
 			CommandType::AskPathToImport =>
@@ -130,8 +120,8 @@ impl Application for App
 			}
 			CommandType::Import(path) =>
 			{
-				self.is_enabled = true;
 				// TODO Import
+				self.is_enabled = true;
 				Command::none()
 			}
 			CommandType::Cancel =>
@@ -212,6 +202,38 @@ impl App
 				command_type,
 			}
 		}
+	}
+
+	fn get_browser(&self, browser_type: BrowserType) -> &dyn Browser
+	{
+		self.browser_states
+			.iter()
+			.find_map(|bs| if bs.browser_type == browser_type { Some(bs.browser.as_ref().unwrap()) } else { None })
+			.unwrap()
+			.as_ref()
+	}
+
+	fn set_browser_message(&mut self, browser_type: BrowserType, message: Option<String>)
+	{
+		let mut browser_state = self.browser_states
+			.iter_mut()
+			.find(|bs| bs.browser_type == browser_type)
+			.unwrap();
+
+		browser_state.message = message;
+	}
+
+	fn export(&self, browser: &dyn Browser, path: &Path) -> Result<(), String>
+	{
+		let entries = browser.export()?;
+
+		let file = File::create(path)
+			.or(Err("Could not create file for exporting at the selected path!".to_string()))?;
+		
+		serde_json::to_writer_pretty(file, &entries)
+			.or(Err("Could not write JSON to the file selected!".to_string()))?;
+
+		Ok(())
 	}
 
 	fn view_browser_state(&self, browser_state: &BrowserState) -> Element<AppMessage>
