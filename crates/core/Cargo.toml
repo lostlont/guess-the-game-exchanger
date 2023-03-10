@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 configparser = "3.0.2"
 dirs = "4.0.0"
+rusty-leveldb = "1.0.6"
 serde = { version = "1.0", features = ["derive"] }
 sqlite = "0.30.4"

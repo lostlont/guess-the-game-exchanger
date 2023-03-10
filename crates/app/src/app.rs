@@ -29,6 +29,7 @@ use
 	core::browser::
 	{
 		Browser,
+		Chrome,
 		Firefox,
 	},
 	crate::
@@ -60,6 +61,7 @@ impl Application for App
 	{
 		let browsers = vec![
 			(BrowserType::Firefox, Firefox::try_new()),
+			(BrowserType::Chrome, Chrome::try_new()),
 		];
 		let browser_states = browsers
 			.into_iter()

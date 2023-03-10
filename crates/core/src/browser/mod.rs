@@ -1,6 +1,8 @@
+mod chrome;
 mod entry;
 mod firefox;
 
+pub use chrome::Chrome;
 pub use entry::Entry;
 pub use firefox::Firefox;
 

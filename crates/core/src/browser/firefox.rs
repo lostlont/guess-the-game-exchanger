@@ -133,10 +133,10 @@ impl Browser for Firefox
 
 fn get_firefox_dir() -> Result<Option<PathBuf>, String>
 {
-	let config_dir = dirs::config_dir();
-	let config_dir = config_dir
-		.ok_or("No config directory is present!".to_string())?;
-	let firefox_dir = config_dir.join("Mozilla/Firefox");
+	let data_dir = dirs::data_dir();
+	let data_dir = data_dir
+		.ok_or("No data directory is present!".to_string())?;
+	let firefox_dir = data_dir.join("Mozilla/Firefox");
 
 	let result = if firefox_dir.exists()
 	{
