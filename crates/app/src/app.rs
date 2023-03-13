@@ -26,10 +26,15 @@ use
 		Element,
 		Length,
 	},
+	sqlite,
 	core::browser::
 	{
 		Browser,
-		Firefox,
+		firefox::
+		{
+			self,
+			Firefox,
+		},
 	},
 	crate::
 	{
@@ -49,6 +54,23 @@ pub struct App
 	is_enabled: bool,
 }
 
+fn try_new_firefox() -> Result<Option<Box<dyn Browser>>, String>
+{
+	let firefox_dir = firefox::get_firefox_dir()?;
+	match firefox_dir
+	{
+		None => Ok(None),
+		Some(firefox_dir) =>
+		{
+			let firefox = Firefox::try_new(
+				&firefox_dir,
+				firefox::read_profiles_ini,
+				|p| sqlite::open(p))?;
+			Ok(Some(firefox))
+		},
+	}
+}
+
 impl Application for App
 {
 	type Executor = iced::executor::Default;
@@ -59,7 +81,7 @@ impl Application for App
 	fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>)
 	{
 		let browsers = vec![
-			(BrowserType::Firefox, Firefox::try_new()),
+			(BrowserType::Firefox, try_new_firefox()),
 		];
 		let browser_states = browsers
 			.into_iter()

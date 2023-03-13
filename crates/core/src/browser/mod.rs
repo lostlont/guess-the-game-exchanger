@@ -1,8 +1,7 @@
-mod entry;
-mod firefox;
+pub mod entry;
+pub mod firefox;
 
-pub use entry::Entry;
-pub use firefox::Firefox;
+use entry::Entry;
 
 pub trait Browser
 {

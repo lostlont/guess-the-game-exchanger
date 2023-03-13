@@ -8,10 +8,18 @@ use
 			File,
 		},
 		io::Read,
-		path::PathBuf,
+		path::
+		{
+			Path,
+			PathBuf,
+		},
 	},
 	configparser::ini::Ini,
-	sqlite::Value,
+	sqlite::
+	{
+		Connection,
+		Value,
+	},
 	crate::browser::
 	{
 		Browser,
@@ -19,48 +27,43 @@ use
 	},
 };
 
-pub struct Firefox
+pub struct Firefox<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<Connection, TError>,
 {
 	db_path: PathBuf,
+	db_provider: TDbProvider,
 }
 
-impl Firefox
+impl<TDbProvider, TError> Firefox<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<Connection, TError> + 'static,
+	TError: 'static,
 {
-	pub fn try_new() -> Result<Option<Box<dyn Browser>>, String>
+	pub fn try_new<TIniProvider>(firefox_dir: &Path, ini_provider: TIniProvider, db_provider: TDbProvider) -> Result<Box<dyn Browser>, String>
+	where
+		TIniProvider: Fn(&Path) -> Result<Ini, String>,
 	{
-		let firefox_dir = get_firefox_dir()?;
+		let profiles_path = firefox_dir.join("profiles.ini");
+		let ini = ini_provider(&profiles_path)?;
+		let profile_dir = get_profile_dir(&ini)?;
+		let db_path = firefox_dir
+			.join(&profile_dir)
+			.join("storage/default/https+++guessthe.game/ls/data.sqlite");
 
-		let result = if let Some(firefox_dir) = firefox_dir
+		let firefox: Box<dyn Browser> = Box::new(Firefox
 		{
-			let profiles_path = firefox_dir.join("profiles.ini");
-			let ini = read_profiles_ini(&profiles_path)?;
-			let profile_dir = get_profile_dir(&ini)?;
-			let db_path = firefox_dir
-				.join(&profile_dir)
-				.join("storage/default/https+++guessthe.game/ls/data.sqlite");
+			db_path,
+			db_provider,
+		});
 
-			if !db_path.exists()
-			{
-				return Err("Could not find profiles file of Firefox!".to_string());
-			}
-			
-			let firefox: Box<dyn Browser> = Box::new(Firefox
-			{
-				db_path,
-			});
-
-			Some(firefox)
-		}
-		else
-		{
-			None
-		};
-
-		Ok(result)
+		Ok(firefox)
 	}
 }
 
-impl Browser for Firefox
+impl<TDbProvider, TError> Browser for Firefox<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<Connection, TError>,
 {
 	fn name(&self) -> &str
 	{
@@ -69,7 +72,7 @@ impl Browser for Firefox
 
 	fn export(&self) -> Result<Vec<Entry>, String>
 	{
-		let connection = sqlite::open(&self.db_path)
+		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
 
 		let mut statement = connection.prepare("select key, utf16_length, value from data")
@@ -131,7 +134,7 @@ impl Browser for Firefox
 	}
 }
 
-fn get_firefox_dir() -> Result<Option<PathBuf>, String>
+pub fn get_firefox_dir() -> Result<Option<PathBuf>, String>
 {
 	let config_dir = dirs::config_dir();
 	let config_dir = config_dir
@@ -149,7 +152,7 @@ fn get_firefox_dir() -> Result<Option<PathBuf>, String>
 	Ok(result)
 }
 
-fn read_profiles_ini(profiles_path: &PathBuf) -> Result<Ini, String>
+pub fn read_profiles_ini(profiles_path: &Path) -> Result<Ini, String>
 {
 	let mut profiles_file = File::open(profiles_path)
 		.or( Err("Could not open profiles file of Firefox!".to_string()))?;
