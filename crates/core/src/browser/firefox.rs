@@ -22,8 +22,9 @@ use
 	},
 	crate::browser::
 	{
+		entry::Entry,
+		profile::Profile,
 		Browser,
-		Entry,
 	},
 };
 
@@ -77,7 +78,7 @@ where
 		"Firefox"
 	}
 
-	fn export(&self) -> Result<Vec<Entry>, String>
+	fn export(&self) -> Result<Profile, String>
 	{
 		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
@@ -99,10 +100,11 @@ where
 			.cloned()
 			.collect::<Vec<_>>();
 
-		Ok(entries)
+		let profile = Profile::from(entries);
+		Ok(profile)
 	}
 
-	fn import(&self, entries: Vec<Entry>) -> Result<(), String>
+	fn import(&self, profile: Profile) -> Result<(), String>
 	{
 		if self.is_backup_enabled
 		{
@@ -121,7 +123,7 @@ where
 			.execute([])
 			.or(Err("Could not delete rows from the database of Firefox!".to_string()))?;
 
-		for entry in entries
+		for entry in profile.get_entries()
 		{
 			let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
 				.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;

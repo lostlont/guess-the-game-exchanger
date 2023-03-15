@@ -10,6 +10,7 @@ mod tests
 		{
 			entry::Entry,
 			firefox::Firefox,
+			profile::Profile,
 		},
 	};
 
@@ -113,25 +114,31 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 			false)
 			.unwrap();
 
-		let entries = firefox.export()
+		let profile = firefox.export()
 			.unwrap();
 
+		let actual = profile
+			.get_entries()
+			.cloned()
+			.collect::<Vec<_>>();
+
+		let expected = vec![
+			Entry
+			{
+				key:"item1".to_string(),
+				utf16_length: 2,
+				value: "ok".as_bytes().iter().cloned().collect(),
+			},
+			Entry
+			{
+				key:"item2".to_string(),
+				utf16_length: 4,
+				value: "fail".as_bytes().iter().cloned().collect(),
+			},
+		];
 		assert_eq!(
-			entries,
-			vec![
-				Entry
-				{
-					key:"item1".to_string(),
-					utf16_length: 2,
-					value: "ok".as_bytes().iter().cloned().collect(),
-				},
-				Entry
-				{
-					key:"item2".to_string(),
-					utf16_length: 4,
-					value: "fail".as_bytes().iter().cloned().collect(),
-				},
-			]);
+			actual,
+			expected);
 	}
 
 	#[test]
@@ -168,9 +175,10 @@ Default = path/to/profile
 				value: "fail".as_bytes().iter().cloned().collect(),
 			},
 		];
+		let profile = Profile::from(entries.clone());
 
 		firefox
-			.import(entries.clone())
+			.import(profile)
 			.unwrap();
 	
 		let actual = db
