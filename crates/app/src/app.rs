@@ -54,23 +54,6 @@ pub struct App
 	is_enabled: bool,
 }
 
-fn try_new_firefox() -> Result<Option<Box<dyn Browser>>, String>
-{
-	let firefox_dir = firefox::get_firefox_dir()?;
-	match firefox_dir
-	{
-		None => Ok(None),
-		Some(firefox_dir) =>
-		{
-			let firefox = Firefox::try_new(
-				&firefox_dir,
-				firefox::read_profiles_ini,
-				|p| sqlite::open(p))?;
-			Ok(Some(firefox))
-		},
-	}
-}
-
 impl Application for App
 {
 	type Executor = iced::executor::Default;
@@ -81,7 +64,7 @@ impl Application for App
 	fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>)
 	{
 		let browsers = vec![
-			(BrowserType::Firefox, try_new_firefox()),
+			(BrowserType::Firefox, App::try_new_firefox()),
 		];
 		let browser_states = browsers
 			.into_iter()
@@ -193,6 +176,23 @@ impl Application for App
 
 impl App
 {
+	fn try_new_firefox() -> Result<Option<Box<dyn Browser>>, String>
+	{
+		let firefox_dir = firefox::get_firefox_dir()?;
+		match firefox_dir
+		{
+			None => Ok(None),
+			Some(firefox_dir) =>
+			{
+				let firefox = Firefox::try_new(
+					&firefox_dir,
+					firefox::read_profiles_ini,
+					|p| sqlite::open(p))?;
+				Ok(Some(firefox))
+			},
+		}
+	}
+	
 	fn ask_path_to_export(&self, browser_type: BrowserType) -> impl Future<Output = AppMessage> + 'static
 	{
 		async move

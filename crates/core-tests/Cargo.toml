@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 configparser = "3.0.2"
-core = { path = "../core" }
+hex = "0.4.3"
 mockall = "0.11.3"
 sqlite = "0.30.4"
+core = { path = "../core" }

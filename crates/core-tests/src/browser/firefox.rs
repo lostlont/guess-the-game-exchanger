@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests
 {
+    use core::browser::entry::Entry;
+
 	use
 	{
 		std::path::Path,
@@ -15,14 +17,14 @@ mod tests
 		let firefox_dir = Path::new("test/firefox");
 
 		let ini_content = r#"
-	[Instal]
-	Default = path/to/profile
-	"#;
+[Instal]
+Default = path/to/profile
+"#;
 
 		let firefox = Firefox::try_new(
 			&firefox_dir,
 			|_path| Ok(create_ini(ini_content)),
-			|_path| create_db());
+			|_path| create_db(""));
 
 		assert!(firefox.is_err());
 	}
@@ -33,14 +35,14 @@ mod tests
 		let firefox_dir = Path::new("test/firefox");
 
 		let ini_content = r#"
-	[Install]
-	Defaul = path/to/profile
-	"#;
+[Install]
+Defaul = path/to/profile
+"#;
 
 		let firefox = Firefox::try_new(
 			&firefox_dir,
 			|_path| Ok(create_ini(ini_content)),
-			|_path| create_db());
+			|_path| create_db(""));
 
 		assert!(firefox.is_err());
 	}
@@ -51,14 +53,14 @@ mod tests
 		let firefox_dir = Path::new("test/firefox");
 		
 		let ini_content = r#"
-		[Install]
-		Default
-		"#;
+[Install]
+Default
+"#;
 		
 		let firefox = Firefox::try_new(
 			&firefox_dir,
 			|_path| Ok(create_ini(ini_content)),
-			|_path| create_db());
+			|_path| create_db(""));
 
 		assert!(firefox.is_err());
 	}
@@ -69,16 +71,61 @@ mod tests
 		let firefox_dir = Path::new("test/firefox");
 
 		let ini_content = r#"
-	[Install]
-	Default = path/to/profile
-	"#;
+[Install]
+Default = path/to/profile
+"#;
 
 		let firefox = Firefox::try_new(
 			&firefox_dir,
 			|_path| Ok(create_ini(ini_content)),
-			|_path| create_db());
+			|_path| create_db(""));
 
 		assert!(firefox.is_ok());
+	}
+
+	#[test]
+	fn export_returns_entries_for_valid_db()
+	{
+		let firefox_dir = Path::new("test/firefox");
+
+		let ini_content = r#"
+[Install]
+Default = path/to/profile
+"#;
+
+		let ok_blob = hex::encode("ok");
+		let fail_blob = hex::encode("fail");
+		let content = format!("
+create table data (key text, utf16_length integer, value blob);
+insert into data values ('item1', 2, X'{ok_blob}');
+insert into data values ('item2', 4, X'{fail_blob}');
+");
+
+		let firefox = Firefox::try_new(
+			&firefox_dir,
+			|_path| Ok(create_ini(ini_content)),
+			move |_path| create_db(&content))
+			.unwrap();
+
+		let entries = firefox.export()
+			.unwrap();
+
+		assert_eq!(
+			entries,
+			vec![
+				Entry
+				{
+					key:"item1".to_string(),
+					utf16_length: 2,
+					value: "ok".as_bytes().iter().cloned().collect(),
+				},
+				Entry
+				{
+					key:"item2".to_string(),
+					utf16_length: 4,
+					value: "fail".as_bytes().iter().cloned().collect(),
+				},
+			]);
 	}
 
 	fn create_ini(content: &str) -> Ini
@@ -90,8 +137,15 @@ mod tests
 		ini
 	}
 
-	fn create_db() -> sqlite::Result<sqlite::Connection>
+	fn create_db(content: &str) -> Result<sqlite::Connection, ()>
 	{
-		sqlite::open(":memory:")
+		let db = sqlite::open(":memory:")
+			.unwrap();
+
+		db
+			.execute(content)
+			.unwrap();
+		
+		Ok(db)
 	}
 }
