@@ -13,6 +13,7 @@ use
 			Path,
 			PathBuf,
 		},
+		string::FromUtf8Error,
 	},
 	configparser::ini::Ini,
 	rusqlite::
@@ -86,19 +87,32 @@ where
 		let mut statement = connection.prepare("select key, utf16_length, value from data")
 			.or(Err("Could not prepare select statement on database of Firefox!".to_string()))?;
 
+		struct RawEntry
+		{
+			pub key: String,
+			pub utf16_length: i64,
+			pub value: Vec<u8>,
+		}
+
 		let entries =  statement
-			.query_map((), |row| Ok(ProfileEntry
+			.query_map((), |row| Ok(RawEntry
 				{
 					key: row.get::<_, String>(0)?,
 					utf16_length: row.get::<_, i64>(1)?,
-					value: Vec::from(row.get::<_, Vec<u8>>(2)?),
+					value: row.get::<_, Vec<u8>>(2)?,
 				}))
 			.or(Err("Could not query rows from the database of Firefox!".to_string()))?
 			.collect::<Result<Vec<_>, _>>()
 			.or(Err("Could not read a row from the database of Firefox!".to_string()))?
-			.iter()
-			.cloned()
-			.collect::<Vec<_>>();
+			.into_iter()
+			.map(|raw| Ok(ProfileEntry
+				{
+					key: raw.key,
+					utf16_length: raw.utf16_length,
+					value: String::from_utf8(raw.value)?,
+				}))
+			.collect::<Result<Vec<_>, FromUtf8Error>>()
+			.or(Err("Could not parse a value as string from the database of Firefox!"))?;
 
 		let profile = Profile::from(entries);
 		Ok(profile)
@@ -125,6 +139,7 @@ where
 
 		for entry in profile.get_entries()
 		{
+			// TODO Try moving out of the loop the insert preparation in the insert statement with rusqlite.
 			let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
 				.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
 
@@ -133,7 +148,7 @@ where
 					{
 						":key": entry.key,
 						":utf16_length": entry.utf16_length,
-						":value": entry.value,
+						":value": entry.value.as_bytes(),
 					})
 				.or(Err("Could not execute insert statement on database of Firefox!"))?;
 		}

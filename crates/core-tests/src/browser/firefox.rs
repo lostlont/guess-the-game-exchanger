@@ -130,13 +130,13 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 			{
 				key:"item1".to_string(),
 				utf16_length: 2,
-				value: "ok".as_bytes().iter().cloned().collect(),
+				value: "ok".to_string(),
 			},
 			ProfileEntry
 			{
 				key:"item2".to_string(),
 				utf16_length: 4,
-				value: "fail".as_bytes().iter().cloned().collect(),
+				value: "fail".to_string(),
 			},
 		];
 		assert_eq!(
@@ -169,13 +169,13 @@ Default = path/to/profile
 			{
 				key:"item1".to_string(),
 				utf16_length: 2,
-				value: "ok".as_bytes().iter().cloned().collect(),
+				value: "ok".to_string(),
 			},
 			ProfileEntry
 			{
 				key:"item2".to_string(),
 				utf16_length: 4,
-				value: "fail".as_bytes().iter().cloned().collect(),
+				value: "fail".to_string(),
 			},
 		];
 		let profile = Profile::from(entries.clone());
@@ -183,20 +183,35 @@ Default = path/to/profile
 		firefox
 			.import(profile)
 			.unwrap();
+
+		struct RawEntry
+		{
+			key: String,
+			utf16_length: i64,
+			value: Vec<u8>,
+		}
 	
 		let actual = db
 			.unwrap()
 			.prepare("select key, utf16_length, value from data")
 			.unwrap()
-			.query_map((), |row| Ok(ProfileEntry
+			.query_map((), |row| Ok(RawEntry
 				{
 					key: row.get::<_, String>(0)?,
 					utf16_length: row.get::<_, i64>(1)?,
-					value: Vec::from(row.get::<_, Vec<u8>>(2)?),
+					value: row.get::<_, Vec<u8>>(2)?,
 				}))
 			.unwrap()
 			.collect::<Result<Vec<_>, _>>()
-			.unwrap();
+			.unwrap()
+			.into_iter()
+			.map(|raw| ProfileEntry
+				{
+					key: raw.key,
+					utf16_length: raw.utf16_length,
+					value: String::from_utf8(raw.value).unwrap(),
+				})
+			.collect::<Vec<_>>();
 
 		assert_eq!(actual, entries);
 	}
