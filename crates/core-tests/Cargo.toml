@@ -9,5 +9,6 @@ edition = "2021"
 configparser = "3.0.2"
 hex = "0.4.3"
 mockall = "0.11.3"
+rusty-leveldb = "1.0.6"
 rusqlite = { version = "0.28.0", features = ["bundled"] }
 core = { path = "../core" }

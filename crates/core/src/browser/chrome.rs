@@ -5,11 +5,6 @@ use
 		Path,
 		PathBuf,
 	},
-	rusty_leveldb::
-	{
-		self,
-		LdbIterator,
-	},
 	crate::
 	{
 		browser::Browser,
@@ -17,43 +12,36 @@ use
 	},
 };
 
-pub struct Chrome
+pub struct Chrome<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<rusty_leveldb::DB, TError>,
 {
 	db_dir: PathBuf,
+	db_provider: TDbProvider,
 }
 
-impl Chrome
+impl<TDbProvider, TError> Chrome<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<rusty_leveldb::DB, TError> + 'static,
+	TError: 'static,
 {
-	pub fn try_new(chrome_dir: &Path) -> Result<Box<dyn Browser>, String>
+	pub fn try_new(chrome_dir: &Path, db_provider: TDbProvider) -> Result<Box<dyn Browser>, String>
 	{
 		let db_dir = chrome_dir.join("User Data/Default/Local Storage/leveldb");
-		/*
-		let options = rusty_leveldb::Options
-		{
-			create_if_missing: false,
-			..rusty_leveldb::Options::default()
-		};
-		let mut db = rusty_leveldb::DB::open(db_dir, options)
-			.or(Err("1".to_string()))?; // TODO
-		let mut iter = db.new_iter().unwrap();
-		while let Some((key, value)) = iter.next()
-		{
-			let key = String::from_utf8(key).unwrap_or("?".to_string());
-			let value = String::from_utf8(value).unwrap_or("?".to_string());
-			println!("{key:?}: {value:?}");
-		}
-		*/
 
 		let chrome: Box<dyn Browser> = Box::new(Chrome
 		{
 			db_dir,
+			db_provider,
 		});
 
 		Ok(chrome)
 	}
 }
 
-impl Browser for Chrome
+impl<TDbProvider, TError> Browser for Chrome<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<rusty_leveldb::DB, TError>,
 {
 	fn name(&self) -> &str
 	{
@@ -62,6 +50,17 @@ impl Browser for Chrome
 
 	fn export(&self) -> Result<Profile, String>
 	{
+		let mut db = (self.db_provider)(&self.db_dir)
+			.or(Err("Could not open storage database of Chrome!".to_string()))?;
+		/*
+		let mut iter = db.new_iter().unwrap();
+		while let Some((key, value)) = iter.next()
+		{
+			let key = String::from_utf8(key).unwrap_or("?".to_string());
+			let value = String::from_utf8(value).unwrap_or("?".to_string());
+			println!("{key:?}: {value:?}");
+		}
+		*/
 		todo!()
 	}
 

@@ -208,7 +208,17 @@ impl App
 			None => Ok(None),
 			Some(chrome_dir) =>
 			{
-				let chrome = Chrome::try_new(&chrome_dir)?;
+				let chrome = Chrome::try_new(
+					&chrome_dir,
+					|p|
+					{
+						let options = rusty_leveldb::Options
+						{
+							create_if_missing: false,
+							..rusty_leveldb::Options::default()
+						};
+						rusty_leveldb::DB::open(p, options)
+					})?;
 				Ok(Some(chrome))
 			},
 		}
