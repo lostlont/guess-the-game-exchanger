@@ -199,27 +199,24 @@ Default = path/to/profile
 		ini
 	}
 
-	fn create_db(content: Option<&str>) -> Result<rusqlite::Connection, ()>
+	fn create_db(content: Option<&str>) -> Result<rusqlite::Connection, rusqlite::Error>
 	{
 		let flags = rusqlite::OpenFlags::default();
 
 		create_db_with(flags, content)
 	}
 
-	fn create_shared_db(content: Option<&str>) -> Result<rusqlite::Connection, ()>
+	fn create_shared_db(content: Option<&str>) -> Result<rusqlite::Connection, rusqlite::Error>
 	{
 		let flags = rusqlite::OpenFlags::default() | rusqlite::OpenFlags::SQLITE_OPEN_SHARED_CACHE;
 
 		create_db_with(flags, content)
 	}
 
-	fn create_db_with(flags: rusqlite::OpenFlags, content: Option<&str>) -> Result<rusqlite::Connection, ()>
+	fn create_db_with(flags: rusqlite::OpenFlags, content: Option<&str>) -> Result<rusqlite::Connection, rusqlite::Error>
 	{
-		// TODO Use .map() instead of () error?
-
 		// ::open_in_memory_with_flags() seems to be not enough for sharing memory. "file::memory:" path solves it.
-		let db = rusqlite::Connection::open_with_flags("file::memory:", flags)
-			.unwrap();
+		let db = rusqlite::Connection::open_with_flags("file::memory:", flags)?;
 
 		let create_data_schema = "create table if not exists data (\
 			key text primary key, \
@@ -228,15 +225,11 @@ Default = path/to/profile
 			compression_type integer not null, \
 			last_access_time integer not null default 0, \
 			value blob not null)";
-		db
-			.execute(create_data_schema, ())
-			.unwrap();
+		db.execute(create_data_schema, ())?;
 
 		if let Some(content) = content
 		{
-			db
-				.execute_batch(content)
-				.unwrap();
+			db.execute_batch(content)?;
 		}
 		
 		Ok(db)
