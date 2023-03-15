@@ -26,11 +26,16 @@ use
 		Element,
 		Length,
 	},
+	rusqlite,
 	core::browser::
 	{
+		chrome::Chrome,
+		firefox::
+		{
+			self,
+			Firefox,
+		},
 		Browser,
-		Chrome,
-		Firefox,
 	},
 	crate::
 	{
@@ -60,8 +65,8 @@ impl Application for App
 	fn new(_flags: Self::Flags) -> (Self, Command<Self::Message>)
 	{
 		let browsers = vec![
-			(BrowserType::Firefox, Firefox::try_new()),
-			(BrowserType::Chrome, Chrome::try_new()),
+			(BrowserType::Firefox, App::try_new_firefox()),
+			(BrowserType::Chrome, App::try_new_chrome()),
 		];
 		let browser_states = browsers
 			.into_iter()
@@ -173,6 +178,29 @@ impl Application for App
 
 impl App
 {
+	fn try_new_firefox() -> Result<Option<Box<dyn Browser>>, String>
+	{
+		let firefox_dir = firefox::get_firefox_dir()?;
+		match firefox_dir
+		{
+			None => Ok(None),
+			Some(firefox_dir) =>
+			{
+				let firefox = Firefox::try_new(
+					&firefox_dir,
+					firefox::read_profiles_ini,
+					|p| rusqlite::Connection::open(p),
+					true)?;
+				Ok(Some(firefox))
+			},
+		}
+	}
+
+	fn try_new_chrome() -> Result<Option<Box<dyn Browser>>, String>
+	{
+		Chrome::try_new()
+	}
+	
 	fn ask_path_to_export(&self, browser_type: BrowserType) -> impl Future<Output = AppMessage> + 'static
 	{
 		async move

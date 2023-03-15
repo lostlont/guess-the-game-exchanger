@@ -19,6 +19,7 @@ impl Chrome
 {
 	pub fn try_new() -> Result<Option<Box<dyn Browser>>, String>
 	{
+		// TODO Move get_chrome_dir out of try_new
 		let chrome_dir = get_chrome_dir()?;
 
 		let result = if let Some(chrome_dir) = chrome_dir

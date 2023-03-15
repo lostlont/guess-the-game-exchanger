@@ -4,7 +4,7 @@ use serde::
 	Serialize,
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Entry
 {
 	pub key: String,

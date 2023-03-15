@@ -1,10 +1,8 @@
-mod chrome;
-mod entry;
-mod firefox;
+pub mod chrome;
+pub mod entry;
+pub mod firefox;
 
-pub use chrome::Chrome;
-pub use entry::Entry;
-pub use firefox::Firefox;
+use entry::Entry;
 
 pub trait Browser
 {

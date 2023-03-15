@@ -8,10 +8,18 @@ use
 			File,
 		},
 		io::Read,
-		path::PathBuf,
+		path::
+		{
+			Path,
+			PathBuf,
+		},
 	},
 	configparser::ini::Ini,
-	sqlite::Value,
+	rusqlite::
+	{
+		named_params,
+		Connection,
+	},
 	crate::browser::
 	{
 		Browser,
@@ -19,48 +27,50 @@ use
 	},
 };
 
-pub struct Firefox
+pub struct Firefox<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<Connection, TError>,
 {
 	db_path: PathBuf,
+	db_provider: TDbProvider,
+	is_backup_enabled: bool,
 }
 
-impl Firefox
+impl<TDbProvider, TError> Firefox<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<Connection, TError> + 'static,
+	TError: 'static,
 {
-	pub fn try_new() -> Result<Option<Box<dyn Browser>>, String>
+	pub fn try_new<TIniProvider>(
+		firefox_dir: &Path,
+		ini_provider: TIniProvider,
+		db_provider: TDbProvider,
+		is_backup_enabled: bool)
+		-> Result<Box<dyn Browser>, String>
+	where
+		TIniProvider: Fn(&Path) -> Result<Ini, String>,
 	{
-		let firefox_dir = get_firefox_dir()?;
+		let profiles_path = firefox_dir.join("profiles.ini");
+		let ini = ini_provider(&profiles_path)?;
+		let profile_dir = get_profile_dir(&ini)?;
+		let db_path = firefox_dir
+			.join(&profile_dir)
+			.join("storage/default/https+++guessthe.game/ls/data.sqlite");
 
-		let result = if let Some(firefox_dir) = firefox_dir
+		let firefox: Box<dyn Browser> = Box::new(Firefox
 		{
-			let profiles_path = firefox_dir.join("profiles.ini");
-			let ini = read_profiles_ini(&profiles_path)?;
-			let profile_dir = get_profile_dir(&ini)?;
-			let db_path = firefox_dir
-				.join(&profile_dir)
-				.join("storage/default/https+++guessthe.game/ls/data.sqlite");
+			db_path,
+			db_provider,
+			is_backup_enabled,
+		});
 
-			if !db_path.exists()
-			{
-				return Err("Could not find profiles file of Firefox!".to_string());
-			}
-			
-			let firefox: Box<dyn Browser> = Box::new(Firefox
-			{
-				db_path,
-			});
-
-			Some(firefox)
-		}
-		else
-		{
-			None
-		};
-
-		Ok(result)
+		Ok(firefox)
 	}
 }
 
-impl Browser for Firefox
+impl<TDbProvider, TError> Browser for Firefox<TDbProvider, TError>
+where
+	TDbProvider: Fn(&Path) -> Result<Connection, TError>,
 {
 	fn name(&self) -> &str
 	{
@@ -69,23 +79,24 @@ impl Browser for Firefox
 
 	fn export(&self) -> Result<Vec<Entry>, String>
 	{
-		let connection = sqlite::open(&self.db_path)
+		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
 
 		let mut statement = connection.prepare("select key, utf16_length, value from data")
 			.or(Err("Could not prepare select statement on database of Firefox!".to_string()))?;
 
 		let entries =  statement
-			.iter()
+			.query_map((), |row| Ok(Entry
+				{
+					key: row.get::<_, String>(0)?,
+					utf16_length: row.get::<_, i64>(1)?,
+					value: Vec::from(row.get::<_, Vec<u8>>(2)?),
+				}))
+			.or(Err("Could not query rows from the database of Firefox!".to_string()))?
 			.collect::<Result<Vec<_>, _>>()
 			.or(Err("Could not read a row from the database of Firefox!".to_string()))?
 			.iter()
-			.map(|row| Entry
-				{
-					key: row.read::<&str, _>(0).to_string(),
-					utf16_length: row.read::<i64, _>(1),
-					value: Vec::from(row.read::<&[u8], _>(2)),
-				})
+			.cloned()
 			.collect::<Vec<_>>();
 
 		Ok(entries)
@@ -93,19 +104,21 @@ impl Browser for Firefox
 
 	fn import(&self, entries: Vec<Entry>) -> Result<(), String>
 	{
-		let backup_path = self.db_path.with_extension("bck");
-		fs::copy(&self.db_path, &backup_path)
-			.or(Err("Could not back up storage database of Firefox!".to_string()))?;
+		if self.is_backup_enabled
+		{
+			let backup_path = self.db_path.with_extension("bck");
+			fs::copy(&self.db_path, &backup_path)
+				.or(Err("Could not back up storage database of Firefox!".to_string()))?;
+		}
 
-		let connection = sqlite::open(&self.db_path)
+		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
 
 		let mut delete_statement = connection.prepare("delete from data")
 			.or(Err("Could not prepare delete statement on database of Firefox!".to_string()))?;
 
 		delete_statement
-			.iter()
-			.collect::<Result<Vec<_>, _>>()
+			.execute([])
 			.or(Err("Could not delete rows from the database of Firefox!".to_string()))?;
 
 		for entry in entries
@@ -113,25 +126,21 @@ impl Browser for Firefox
 			let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
 				.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
 
-			let parameters = [
-				(":key", entry.key.into()),
-				(":utf16_length", entry.utf16_length.into()),
-				(":value", entry.value.into()),
-			];
-			insert_statement.bind::<&[(_, Value)]>(&parameters[..])
-				.or(Err("Could not bind parameters to statement in insert statement on database of Firefox!"))?;
-
 			insert_statement
-				.iter()
-				.collect::<Result<Vec<_>, _>>()
-				.or(Err("Could not insert rows into the database of Firefox!".to_string()))?;
+				.execute(named_params!
+					{
+						":key": entry.key,
+						":utf16_length": entry.utf16_length,
+						":value": entry.value,
+					})
+				.or(Err("Could not execute insert statement on database of Firefox!"))?;
 		}
 
 		Ok(())
 	}
 }
 
-fn get_firefox_dir() -> Result<Option<PathBuf>, String>
+pub fn get_firefox_dir() -> Result<Option<PathBuf>, String>
 {
 	let data_dir = dirs::data_dir();
 	let data_dir = data_dir
@@ -149,7 +158,7 @@ fn get_firefox_dir() -> Result<Option<PathBuf>, String>
 	Ok(result)
 }
 
-fn read_profiles_ini(profiles_path: &PathBuf) -> Result<Ini, String>
+pub fn read_profiles_ini(profiles_path: &Path) -> Result<Ini, String>
 {
 	let mut profiles_file = File::open(profiles_path)
 		.or( Err("Could not open profiles file of Firefox!".to_string()))?;
