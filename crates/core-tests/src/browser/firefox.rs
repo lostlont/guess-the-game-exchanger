@@ -129,13 +129,11 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 			ProfileEntry
 			{
 				key:"item1".to_string(),
-				utf16_length: 2,
 				value: "ok".to_string(),
 			},
 			ProfileEntry
 			{
 				key:"item2".to_string(),
-				utf16_length: 4,
 				value: "fail".to_string(),
 			},
 		];
@@ -167,14 +165,12 @@ Default = path/to/profile
 		let entries = vec![
 			ProfileEntry
 			{
-				key:"item1".to_string(),
-				utf16_length: 2,
+				key: "item1".to_string(),
 				value: "ok".to_string(),
 			},
 			ProfileEntry
 			{
-				key:"item2".to_string(),
-				utf16_length: 4,
+				key: "item2".to_string(),
 				value: "fail".to_string(),
 			},
 		];
@@ -184,6 +180,7 @@ Default = path/to/profile
 			.import(profile)
 			.unwrap();
 
+		#[derive(Debug, PartialEq)]
 		struct RawEntry
 		{
 			key: String,
@@ -203,17 +200,23 @@ Default = path/to/profile
 				}))
 			.unwrap()
 			.collect::<Result<Vec<_>, _>>()
-			.unwrap()
-			.into_iter()
-			.map(|raw| ProfileEntry
-				{
-					key: raw.key,
-					utf16_length: raw.utf16_length,
-					value: String::from_utf8(raw.value).unwrap(),
-				})
-			.collect::<Vec<_>>();
+			.unwrap();
 
-		assert_eq!(actual, entries);
+		let expected = vec![
+			RawEntry
+			{
+				key: "item1".to_string(),
+				utf16_length: 2,
+				value: "ok".bytes().collect(),
+			},
+			RawEntry
+			{
+				key: "item2".to_string(),
+				utf16_length: 4,
+				value: "fail".bytes().collect(),
+			},
+		];
+		assert_eq!(actual, expected);
 	}
 
 	fn create_ini(content: &str) -> Ini

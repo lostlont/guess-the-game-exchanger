@@ -8,6 +8,5 @@ use serde::
 pub struct ProfileEntry
 {
 	pub key: String,
-	pub utf16_length: i64,
 	pub value: String,
 }

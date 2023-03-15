@@ -90,7 +90,6 @@ where
 		struct RawEntry
 		{
 			pub key: String,
-			pub utf16_length: i64,
 			pub value: Vec<u8>,
 		}
 
@@ -98,7 +97,6 @@ where
 			.query_map((), |row| Ok(RawEntry
 				{
 					key: row.get::<_, String>(0)?,
-					utf16_length: row.get::<_, i64>(1)?,
 					value: row.get::<_, Vec<u8>>(2)?,
 				}))
 			.or(Err("Could not query rows from the database of Firefox!".to_string()))?
@@ -108,7 +106,6 @@ where
 			.map(|raw| Ok(ProfileEntry
 				{
 					key: raw.key,
-					utf16_length: raw.utf16_length,
 					value: String::from_utf8(raw.value)?,
 				}))
 			.collect::<Result<Vec<_>, FromUtf8Error>>()
@@ -147,7 +144,7 @@ where
 				.execute(named_params!
 					{
 						":key": entry.key,
-						":utf16_length": entry.utf16_length,
+						":utf16_length": entry.value.len(),
 						":value": entry.value.as_bytes(),
 					})
 				.or(Err("Could not execute insert statement on database of Firefox!"))?;
