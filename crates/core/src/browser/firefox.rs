@@ -134,12 +134,11 @@ where
 			.execute([])
 			.or(Err("Could not delete rows from the database of Firefox!".to_string()))?;
 
+		let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
+			.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
+
 		for entry in profile.get_entries()
 		{
-			// TODO Try moving out of the loop the insert preparation in the insert statement with rusqlite.
-			let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
-				.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
-
 			insert_statement
 				.execute(named_params!
 					{
