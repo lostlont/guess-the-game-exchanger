@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 configparser = "3.0.2"
 dirs = "4.0.0"
+rusqlite = { version = "0.28.0", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }
-sqlite = "0.30.4"

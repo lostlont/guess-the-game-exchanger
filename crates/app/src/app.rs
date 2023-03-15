@@ -26,7 +26,7 @@ use
 		Element,
 		Length,
 	},
-	sqlite,
+	rusqlite,
 	core::browser::
 	{
 		Browser,
@@ -187,7 +187,8 @@ impl App
 				let firefox = Firefox::try_new(
 					&firefox_dir,
 					firefox::read_profiles_ini,
-					|p| sqlite::open(p))?;
+					|p| rusqlite::Connection::open(p),
+					true)?;
 				Ok(Some(firefox))
 			},
 		}

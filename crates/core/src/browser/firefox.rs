@@ -15,10 +15,10 @@ use
 		},
 	},
 	configparser::ini::Ini,
-	sqlite::
+	rusqlite::
 	{
+		named_params,
 		Connection,
-		Value,
 	},
 	crate::browser::
 	{
@@ -33,6 +33,7 @@ where
 {
 	db_path: PathBuf,
 	db_provider: TDbProvider,
+	is_backup_enabled: bool,
 }
 
 impl<TDbProvider, TError> Firefox<TDbProvider, TError>
@@ -40,7 +41,12 @@ where
 	TDbProvider: Fn(&Path) -> Result<Connection, TError> + 'static,
 	TError: 'static,
 {
-	pub fn try_new<TIniProvider>(firefox_dir: &Path, ini_provider: TIniProvider, db_provider: TDbProvider) -> Result<Box<dyn Browser>, String>
+	pub fn try_new<TIniProvider>(
+		firefox_dir: &Path,
+		ini_provider: TIniProvider,
+		db_provider: TDbProvider,
+		is_backup_enabled: bool)
+		-> Result<Box<dyn Browser>, String>
 	where
 		TIniProvider: Fn(&Path) -> Result<Ini, String>,
 	{
@@ -55,6 +61,7 @@ where
 		{
 			db_path,
 			db_provider,
+			is_backup_enabled,
 		});
 
 		Ok(firefox)
@@ -79,16 +86,17 @@ where
 			.or(Err("Could not prepare select statement on database of Firefox!".to_string()))?;
 
 		let entries =  statement
-			.iter()
+			.query_map((), |row| Ok(Entry
+				{
+					key: row.get::<_, String>(0)?,
+					utf16_length: row.get::<_, i64>(1)?,
+					value: Vec::from(row.get::<_, Vec<u8>>(2)?),
+				}))
+			.or(Err("Could not query rows from the database of Firefox!".to_string()))?
 			.collect::<Result<Vec<_>, _>>()
 			.or(Err("Could not read a row from the database of Firefox!".to_string()))?
 			.iter()
-			.map(|row| Entry
-				{
-					key: row.read::<&str, _>(0).to_string(),
-					utf16_length: row.read::<i64, _>(1),
-					value: Vec::from(row.read::<&[u8], _>(2)),
-				})
+			.cloned()
 			.collect::<Vec<_>>();
 
 		Ok(entries)
@@ -96,19 +104,21 @@ where
 
 	fn import(&self, entries: Vec<Entry>) -> Result<(), String>
 	{
-		let backup_path = self.db_path.with_extension("bck");
-		fs::copy(&self.db_path, &backup_path)
-			.or(Err("Could not back up storage database of Firefox!".to_string()))?;
+		if self.is_backup_enabled
+		{
+			let backup_path = self.db_path.with_extension("bck");
+			fs::copy(&self.db_path, &backup_path)
+				.or(Err("Could not back up storage database of Firefox!".to_string()))?;
+		}
 
-		let connection = sqlite::open(&self.db_path)
+		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
 
 		let mut delete_statement = connection.prepare("delete from data")
 			.or(Err("Could not prepare delete statement on database of Firefox!".to_string()))?;
 
 		delete_statement
-			.iter()
-			.collect::<Result<Vec<_>, _>>()
+			.execute([])
 			.or(Err("Could not delete rows from the database of Firefox!".to_string()))?;
 
 		for entry in entries
@@ -116,18 +126,14 @@ where
 			let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
 				.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
 
-			let parameters = [
-				(":key", entry.key.into()),
-				(":utf16_length", entry.utf16_length.into()),
-				(":value", entry.value.into()),
-			];
-			insert_statement.bind::<&[(_, Value)]>(&parameters[..])
-				.or(Err("Could not bind parameters to statement in insert statement on database of Firefox!"))?;
-
 			insert_statement
-				.iter()
-				.collect::<Result<Vec<_>, _>>()
-				.or(Err("Could not insert rows into the database of Firefox!".to_string()))?;
+				.execute(named_params!
+					{
+						":key": entry.key,
+						":utf16_length": entry.utf16_length,
+						":value": entry.value,
+					})
+				.or(Err("Could not execute insert statement on database of Firefox!"))?;
 		}
 
 		Ok(())
