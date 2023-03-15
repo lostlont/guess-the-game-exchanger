@@ -29,7 +29,11 @@ use
 	rusqlite,
 	core::browser::
 	{
-		chrome::Chrome,
+		chrome::
+		{
+			self,
+			Chrome,
+		},
 		firefox::
 		{
 			self,
@@ -198,7 +202,16 @@ impl App
 
 	fn try_new_chrome() -> Result<Option<Box<dyn Browser>>, String>
 	{
-		Chrome::try_new()
+		let chrome_dir = chrome::get_chrome_dir()?;
+		match chrome_dir
+		{
+			None => Ok(None),
+			Some(chrome_dir) =>
+			{
+				let chrome = Chrome::try_new(&chrome_dir)?;
+				Ok(Some(chrome))
+			},
+		}
 	}
 	
 	fn ask_path_to_export(&self, browser_type: BrowserType) -> impl Future<Output = AppMessage> + 'static
