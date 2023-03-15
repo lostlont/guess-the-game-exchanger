@@ -1,8 +1,6 @@
-pub mod entry;
 pub mod firefox;
-pub mod profile;
 
-use profile::Profile;
+use crate::profile::Profile;
 
 pub trait Browser
 {

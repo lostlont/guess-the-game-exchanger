@@ -5,13 +5,13 @@ use
 		Deserialize,
 		Serialize,
 	},
-	crate::browser::entry::Entry,
+	super::ProfileEntry,
 };
 
 #[derive(Deserialize, Serialize)]
 pub struct Profile
 {
-	entries: Vec<Entry>,
+	entries: Vec<ProfileEntry>,
 }
 
 impl Profile
@@ -24,7 +24,7 @@ impl Profile
 		}
 	}
 
-	pub fn from(entries: impl IntoIterator<Item = Entry>) -> Self
+	pub fn from(entries: impl IntoIterator<Item = ProfileEntry>) -> Self
 	{
 		Self
 		{
@@ -34,7 +34,7 @@ impl Profile
 		}
 	}
 
-	pub fn get_entries(&self) -> impl Iterator<Item = &Entry>
+	pub fn get_entries(&self) -> impl Iterator<Item = &ProfileEntry>
 	{
 		self.entries.iter()
 	}

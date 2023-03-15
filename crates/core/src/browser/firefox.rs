@@ -20,12 +20,12 @@ use
 		named_params,
 		Connection,
 	},
-	crate::browser::
+	crate::profile::
 	{
-		entry::Entry,
-		profile::Profile,
-		Browser,
+		Profile,
+		ProfileEntry,
 	},
+	super::Browser,
 };
 
 pub struct Firefox<TDbProvider, TError>
@@ -87,7 +87,7 @@ where
 			.or(Err("Could not prepare select statement on database of Firefox!".to_string()))?;
 
 		let entries =  statement
-			.query_map((), |row| Ok(Entry
+			.query_map((), |row| Ok(ProfileEntry
 				{
 					key: row.get::<_, String>(0)?,
 					utf16_length: row.get::<_, i64>(1)?,

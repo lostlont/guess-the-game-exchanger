@@ -4,9 +4,8 @@ use serde::
 	Serialize,
 };
 
-// TODO Rename to ProfileEntry
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Entry
+pub struct ProfileEntry
 {
 	pub key: String,
 	pub utf16_length: i64,

@@ -29,12 +29,12 @@ use
 	rusqlite,
 	core::browser::
 	{
-		Browser,
 		firefox::
 		{
 			self,
 			Firefox,
 		},
+		Browser,
 	},
 	crate::
 	{
@@ -378,5 +378,5 @@ impl App
 			.height(32)
 			.style(color)
 			.into()
-}
+	}
 }

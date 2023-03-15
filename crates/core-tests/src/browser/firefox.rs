@@ -6,11 +6,14 @@ mod tests
 		std::path::Path,
 		configparser::ini::Ini,
 		rusqlite,
-		core::browser::
+		core::
 		{
-			entry::Entry,
-			firefox::Firefox,
-			profile::Profile,
+			browser::firefox::Firefox,
+			profile::
+			{
+				Profile,
+				ProfileEntry,
+			},
 		},
 	};
 
@@ -123,13 +126,13 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 			.collect::<Vec<_>>();
 
 		let expected = vec![
-			Entry
+			ProfileEntry
 			{
 				key:"item1".to_string(),
 				utf16_length: 2,
 				value: "ok".as_bytes().iter().cloned().collect(),
 			},
-			Entry
+			ProfileEntry
 			{
 				key:"item2".to_string(),
 				utf16_length: 4,
@@ -162,13 +165,13 @@ Default = path/to/profile
 			.unwrap();
 
 		let entries = vec![
-			Entry
+			ProfileEntry
 			{
 				key:"item1".to_string(),
 				utf16_length: 2,
 				value: "ok".as_bytes().iter().cloned().collect(),
 			},
-			Entry
+			ProfileEntry
 			{
 				key:"item2".to_string(),
 				utf16_length: 4,
@@ -185,7 +188,7 @@ Default = path/to/profile
 			.unwrap()
 			.prepare("select key, utf16_length, value from data")
 			.unwrap()
-			.query_map((), |row| Ok(Entry
+			.query_map((), |row| Ok(ProfileEntry
 				{
 					key: row.get::<_, String>(0)?,
 					utf16_length: row.get::<_, i64>(1)?,
