@@ -6,10 +6,14 @@ mod tests
 		std::path::Path,
 		configparser::ini::Ini,
 		rusqlite,
-		core::browser::
+		core::
 		{
-			entry::Entry,
-			firefox::Firefox,
+			browser::firefox::Firefox,
+			profile::
+			{
+				Profile,
+				ProfileEntry,
+			},
 		},
 	};
 
@@ -113,25 +117,29 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 			false)
 			.unwrap();
 
-		let entries = firefox.export()
+		let profile = firefox.export()
 			.unwrap();
 
+		let actual = profile
+			.get_entries()
+			.cloned()
+			.collect::<Vec<_>>();
+
+		let expected = vec![
+			ProfileEntry
+			{
+				key:"item1".to_string(),
+				value: "ok".to_string(),
+			},
+			ProfileEntry
+			{
+				key:"item2".to_string(),
+				value: "fail".to_string(),
+			},
+		];
 		assert_eq!(
-			entries,
-			vec![
-				Entry
-				{
-					key:"item1".to_string(),
-					utf16_length: 2,
-					value: "ok".as_bytes().iter().cloned().collect(),
-				},
-				Entry
-				{
-					key:"item2".to_string(),
-					utf16_length: 4,
-					value: "fail".as_bytes().iter().cloned().collect(),
-				},
-			]);
+			actual,
+			expected);
 	}
 
 	#[test]
@@ -155,39 +163,60 @@ Default = path/to/profile
 			.unwrap();
 
 		let entries = vec![
-			Entry
+			ProfileEntry
 			{
-				key:"item1".to_string(),
-				utf16_length: 2,
-				value: "ok".as_bytes().iter().cloned().collect(),
+				key: "item1".to_string(),
+				value: "ok".to_string(),
 			},
-			Entry
+			ProfileEntry
 			{
-				key:"item2".to_string(),
-				utf16_length: 4,
-				value: "fail".as_bytes().iter().cloned().collect(),
+				key: "item2".to_string(),
+				value: "fail".to_string(),
 			},
 		];
+		let profile = Profile::from(entries.clone());
 
 		firefox
-			.import(entries.clone())
+			.import(profile)
 			.unwrap();
+
+		#[derive(Debug, PartialEq)]
+		struct RawEntry
+		{
+			key: String,
+			utf16_length: i64,
+			value: Vec<u8>,
+		}
 	
 		let actual = db
 			.unwrap()
 			.prepare("select key, utf16_length, value from data")
 			.unwrap()
-			.query_map((), |row| Ok(Entry
+			.query_map((), |row| Ok(RawEntry
 				{
 					key: row.get::<_, String>(0)?,
 					utf16_length: row.get::<_, i64>(1)?,
-					value: Vec::from(row.get::<_, Vec<u8>>(2)?),
+					value: row.get::<_, Vec<u8>>(2)?,
 				}))
 			.unwrap()
 			.collect::<Result<Vec<_>, _>>()
 			.unwrap();
 
-		assert_eq!(actual, entries);
+		let expected = vec![
+			RawEntry
+			{
+				key: "item1".to_string(),
+				utf16_length: 2,
+				value: "ok".bytes().collect(),
+			},
+			RawEntry
+			{
+				key: "item2".to_string(),
+				utf16_length: 4,
+				value: "fail".bytes().collect(),
+			},
+		];
+		assert_eq!(actual, expected);
 	}
 
 	fn create_ini(content: &str) -> Ini

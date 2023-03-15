@@ -5,9 +5,8 @@ use serde::
 };
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Entry
+pub struct ProfileEntry
 {
 	pub key: String,
-	pub utf16_length: i64,
-	pub value: Vec<u8>,
+	pub value: String,
 }

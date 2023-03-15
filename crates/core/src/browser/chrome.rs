@@ -6,10 +6,10 @@ use
 		self,
 		LdbIterator,
 	},
-	crate::browser::
+	crate::
 	{
-		Browser,
-		Entry,
+		browser::Browser,
+		profile::Profile,
 	},
 };
 
@@ -62,12 +62,12 @@ impl Browser for Chrome
 		"Chrome"
 	}
 
-	fn export(&self) -> Result<Vec<Entry>, String>
+	fn export(&self) -> Result<Profile, String>
 	{
 		todo!()
 	}
 
-	fn import(&self, entries: Vec<Entry>) -> Result<(), String>
+	fn import(&self, profile: Profile) -> Result<(), String>
 	{
 		todo!()
 	}

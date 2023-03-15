@@ -274,12 +274,12 @@ impl App
 
 	fn export(&self, browser: &dyn Browser, path: &Path) -> Result<(), String>
 	{
-		let entries = browser.export()?;
+		let profile = browser.export()?;
 
 		let file = File::create(path)
 			.or(Err("Could not create file for exporting at the selected path!".to_string()))?;
 		
-		serde_json::to_writer_pretty(file, &entries)
+		serde_json::to_writer_pretty(file, &profile)
 			.or(Err("Could not write JSON to the selected file!".to_string()))?;
 
 		Ok(())
@@ -385,5 +385,5 @@ impl App
 			.height(32)
 			.style(color)
 			.into()
-}
+	}
 }

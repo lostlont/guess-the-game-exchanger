@@ -13,6 +13,7 @@ use
 			Path,
 			PathBuf,
 		},
+		string::FromUtf8Error,
 	},
 	configparser::ini::Ini,
 	rusqlite::
@@ -20,11 +21,12 @@ use
 		named_params,
 		Connection,
 	},
-	crate::browser::
+	crate::profile::
 	{
-		Browser,
-		Entry,
+		Profile,
+		ProfileEntry,
 	},
+	super::Browser,
 };
 
 pub struct Firefox<TDbProvider, TError>
@@ -77,7 +79,7 @@ where
 		"Firefox"
 	}
 
-	fn export(&self) -> Result<Vec<Entry>, String>
+	fn export(&self) -> Result<Profile, String>
 	{
 		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
@@ -85,24 +87,35 @@ where
 		let mut statement = connection.prepare("select key, utf16_length, value from data")
 			.or(Err("Could not prepare select statement on database of Firefox!".to_string()))?;
 
+		struct RawEntry
+		{
+			pub key: String,
+			pub value: Vec<u8>,
+		}
+
 		let entries =  statement
-			.query_map((), |row| Ok(Entry
+			.query_map((), |row| Ok(RawEntry
 				{
 					key: row.get::<_, String>(0)?,
-					utf16_length: row.get::<_, i64>(1)?,
-					value: Vec::from(row.get::<_, Vec<u8>>(2)?),
+					value: row.get::<_, Vec<u8>>(2)?,
 				}))
 			.or(Err("Could not query rows from the database of Firefox!".to_string()))?
 			.collect::<Result<Vec<_>, _>>()
 			.or(Err("Could not read a row from the database of Firefox!".to_string()))?
-			.iter()
-			.cloned()
-			.collect::<Vec<_>>();
+			.into_iter()
+			.map(|raw| Ok(ProfileEntry
+				{
+					key: raw.key,
+					value: String::from_utf8(raw.value)?,
+				}))
+			.collect::<Result<Vec<_>, FromUtf8Error>>()
+			.or(Err("Could not parse a value as string from the database of Firefox!"))?;
 
-		Ok(entries)
+		let profile = Profile::from(entries);
+		Ok(profile)
 	}
 
-	fn import(&self, entries: Vec<Entry>) -> Result<(), String>
+	fn import(&self, profile: Profile) -> Result<(), String>
 	{
 		if self.is_backup_enabled
 		{
@@ -121,17 +134,17 @@ where
 			.execute([])
 			.or(Err("Could not delete rows from the database of Firefox!".to_string()))?;
 
-		for entry in entries
-		{
-			let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
-				.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
+		let mut insert_statement = connection.prepare("insert into data values (:key, :utf16_length, 1, 0, 0, :value)")
+			.or(Err("Could not prepare insert statement on database of Firefox!".to_string()))?;
 
+		for entry in profile.get_entries()
+		{
 			insert_statement
 				.execute(named_params!
 					{
 						":key": entry.key,
-						":utf16_length": entry.utf16_length,
-						":value": entry.value,
+						":utf16_length": entry.value.len(),
+						":value": entry.value.as_bytes(),
 					})
 				.or(Err("Could not execute insert statement on database of Firefox!"))?;
 		}
