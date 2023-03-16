@@ -66,14 +66,28 @@ where
 		{
 			let key = String::from_utf8(key)
 				.or(Err("Could not parse a key as a string from the database of Chrome!".to_string()))?;
-			let value = String::from_utf8(value)
-				.or(Err("Could not parse a value as a string from the database of Chrome!".to_string()))?;
-			let entry = ProfileEntry
+
+			if let Some(key) = key.strip_prefix("_https://guessthe.game\0\u{1}")
 			{
-				key,
-				value,
-			};
-			entries.push(entry);
+				let exclude_list = vec!["CMPList", "_cmpRepromptHash", "noniabvendorconsent"];
+				if !exclude_list.contains(&key)
+				{
+					let value = String::from_utf8(value);
+
+					if let Ok(value) = value
+					{
+						if let Some(value) = value.strip_prefix("\u{1}")
+						{
+							let entry = ProfileEntry
+							{
+								key: key.to_string(),
+								value: value.to_string(),
+							};
+							entries.push(entry);
+						}
+					}
+				}
+			}
 		}
 
 		let profile = Profile::from(entries);

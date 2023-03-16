@@ -24,13 +24,26 @@ mod tests
 	}
 
 	#[test]
-	fn export_returns_entries()
+	fn export_returns_entries_filtered()
 	{
 		let chrome_dir = Path::new("test/chrome");
 
 		let db_content = vec![
-			("item1".as_bytes(), "ok".as_bytes()),
-			("item2".as_bytes(), "fail".as_bytes()),
+			("META:chrome://settings".as_bytes(), &[192, 255][..]),
+			("META:https://guessthe.game".as_bytes(), "?".as_bytes()),
+			("VERSION".as_bytes(), "1".as_bytes()),
+			("_chrome://settings\0\u{1}signin-promo-count".as_bytes(), "\u{1}1".as_bytes()),
+			("_https://guessthe.game\0\u{1}255_gamestate".as_bytes(), "\u{1}win".as_bytes()),
+			("_https://guessthe.game\0\u{1}255_guess1".as_bytes(), "\u{1}Game Name".as_bytes()),
+			("_https://guessthe.game\0\u{1}300_gamestate".as_bytes(), "\u{1}lose".as_bytes()),
+			("_https://guessthe.game\0\u{1}300_guess1".as_bytes(), "\u{1}Skipped!".as_bytes()),
+			("_https://guessthe.game\0\u{1}300_guess2".as_bytes(), "\u{1}Skipped!".as_bytes()),
+			("_https://guessthe.game\0\u{1}CMPList".as_bytes(), "\u{1}{\"key\":\"value\"}".as_bytes()),
+			("_https://guessthe.game\0\u{1}_cmpRepromptHash".as_bytes(), "\u{1}ABC".as_bytes()),
+			("_https://guessthe.game\0\u{1}currentstreak".as_bytes(), "\u{1}0".as_bytes()),
+			("_https://guessthe.game\0\u{1}noniabvendorconsent".as_bytes(), "\u{1}consent".as_bytes()),
+			("_https://guessthe.game\0\u{1}totalplayed".as_bytes(), "\u{1}2".as_bytes()),
+			("_https://other.page\0\u{1}301_gamestate".as_bytes(), "\u{1}x".as_bytes()),
 		];
 		let chrome = Chrome::try_new(
 			&chrome_dir,
@@ -49,13 +62,38 @@ mod tests
 		let expected = vec![
 			ProfileEntry
 			{
-				key:"item1".to_string(),
-				value: "ok".to_string(),
+				key:"255_gamestate".to_string(),
+				value: "win".to_string(),
 			},
 			ProfileEntry
 			{
-				key:"item2".to_string(),
-				value: "fail".to_string(),
+				key:"255_guess1".to_string(),
+				value: "Game Name".to_string(),
+			},
+			ProfileEntry
+			{
+				key:"300_gamestate".to_string(),
+				value: "lose".to_string(),
+			},
+			ProfileEntry
+			{
+				key:"300_guess1".to_string(),
+				value: "Skipped!".to_string(),
+			},
+			ProfileEntry
+			{
+				key:"300_guess2".to_string(),
+				value: "Skipped!".to_string(),
+			},
+			ProfileEntry
+			{
+				key:"currentstreak".to_string(),
+				value: "0".to_string(),
+			},
+			ProfileEntry
+			{
+				key:"totalplayed".to_string(),
+				value: "2".to_string(),
 			},
 		];
 		assert_eq!(actual, expected);
