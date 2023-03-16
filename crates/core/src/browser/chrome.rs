@@ -21,6 +21,13 @@ use
 	},
 };
 
+pub const KEY_PREFIX: &str = "_https://guessthe.game\0\u{1}";
+pub const VALUE_PREFIX: &str = "\u{1}";
+const ALLOWED_LIST: &[&str; 10] = &[
+	"onefers", "twofers", "threefers", "quads", "fivers", "sixers",
+	"currentstreak", "maxstreak", "totalplayed", "totalwon",
+];
+
 pub struct Chrome<TDbProvider, TError>
 where
 	TDbProvider: Fn(&Path) -> Result<rusty_leveldb::DB, TError>,
@@ -116,8 +123,8 @@ where
 
 		for entry in profile.get_entries()
 		{
-			let key = "_https://guessthe.game\0\u{1}".to_string() + &entry.key;
-			let value = "\u{1}".to_string() + &entry.value;
+			let key = KEY_PREFIX.to_string() + &entry.key;
+			let value = VALUE_PREFIX.to_string() + &entry.value;
 			db
 				.put(key.as_bytes(), value.as_bytes())
 				.or(Err("Could not add entry to the database of Chrome!"))?;
@@ -163,10 +170,9 @@ fn try_parse_key(key: Vec<u8>) -> Result<Option<String>, String>
 	let key = String::from_utf8(key)
 		.or(Err("Could not parse a key as a string from the database of Chrome!".to_string()))?;
 
-	if let Some(key) = key.strip_prefix("_https://guessthe.game\0\u{1}")
+	if let Some(key) = key.strip_prefix(KEY_PREFIX)
 	{
-		let exclude_list = vec!["CMPList", "_cmpRepromptHash", "noniabvendorconsent"];
-		if !exclude_list.contains(&key)
+		if key.ends_with("_gamestate") || key.contains("_guess") || ALLOWED_LIST.contains(&key)
 		{
 			return Ok(Some(key.to_string()));
 		}
@@ -181,7 +187,7 @@ fn try_parse_value(value: Vec<u8>) -> Option<String>
 
 	if let Ok(value) = value
 	{
-		if let Some(value) = value.strip_prefix("\u{1}")
+		if let Some(value) = value.strip_prefix(VALUE_PREFIX)
 		{
 			return Some(value.to_string());
 		}
