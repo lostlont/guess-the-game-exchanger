@@ -18,7 +18,8 @@ mod tests
 
 		let chrome = Chrome::try_new(
 			&chrome_dir,
-			|_path| create_db(None));
+			|_path| create_db(None),
+			false);
 
 		assert!(chrome.is_ok());
 	}
@@ -47,7 +48,8 @@ mod tests
 		];
 		let chrome = Chrome::try_new(
 			&chrome_dir,
-			move |_path| create_db(Some(db_content.as_slice())))
+			move |_path| create_db(Some(db_content.as_slice())),
+			false)
 			.unwrap();
 
 		let profile = chrome
@@ -98,6 +100,11 @@ mod tests
 		];
 		assert_eq!(actual, expected);
 	}
+
+	// TODO Test Chrome::import()
+	// It would require either more instances of the database with shared memory, like with SQLite - which is not doable with LevelDB,
+	// or changing the interface of the functions to shared references - which is fishy,
+	// or using traits to fully mock objects.
 
 	fn create_db<'a>(content: Option<&[(&'a [u8], &'a [u8])]>) -> Result<rusty_leveldb::DB, rusty_leveldb::Status>
 	{

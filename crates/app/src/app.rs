@@ -218,7 +218,8 @@ impl App
 							..rusty_leveldb::Options::default()
 						};
 						rusty_leveldb::DB::open(p, options)
-					})?;
+					},
+					true)?;
 				Ok(Some(chrome))
 			},
 		}

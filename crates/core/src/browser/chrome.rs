@@ -1,9 +1,13 @@
 use
 {
-	std::path::
+	std::
 	{
-		Path,
-		PathBuf,
+		fs,
+		path::
+		{
+			Path,
+			PathBuf,
+		},
 	},
 	rusty_leveldb::LdbIterator,
 	crate::
@@ -23,6 +27,7 @@ where
 {
 	db_dir: PathBuf,
 	db_provider: TDbProvider,
+	is_backup_enabled: bool,
 }
 
 impl<TDbProvider, TError> Chrome<TDbProvider, TError>
@@ -30,7 +35,7 @@ where
 	TDbProvider: Fn(&Path) -> Result<rusty_leveldb::DB, TError> + 'static,
 	TError: 'static,
 {
-	pub fn try_new(chrome_dir: &Path, db_provider: TDbProvider) -> Result<Box<dyn Browser>, String>
+	pub fn try_new(chrome_dir: &Path, db_provider: TDbProvider, is_backup_enabled: bool) -> Result<Box<dyn Browser>, String>
 	{
 		let db_dir = chrome_dir.join("User Data/Default/Local Storage/leveldb");
 
@@ -38,6 +43,7 @@ where
 		{
 			db_dir,
 			db_provider,
+			is_backup_enabled,
 		});
 
 		Ok(chrome)
@@ -64,28 +70,16 @@ where
 		let mut entries = vec![];
 		while let Some((key, value)) = iter.next()
 		{
-			let key = String::from_utf8(key)
-				.or(Err("Could not parse a key as a string from the database of Chrome!".to_string()))?;
-
-			if let Some(key) = key.strip_prefix("_https://guessthe.game\0\u{1}")
+			if let Some(key) = try_parse_key(key)?
 			{
-				let exclude_list = vec!["CMPList", "_cmpRepromptHash", "noniabvendorconsent"];
-				if !exclude_list.contains(&key)
+				if let Some(value) = try_parse_value(value)
 				{
-					let value = String::from_utf8(value);
-
-					if let Ok(value) = value
+					let entry = ProfileEntry
 					{
-						if let Some(value) = value.strip_prefix("\u{1}")
-						{
-							let entry = ProfileEntry
-							{
-								key: key.to_string(),
-								value: value.to_string(),
-							};
-							entries.push(entry);
-						}
-					}
+						key,
+						value,
+					};
+					entries.push(entry);
 				}
 			}
 		}
@@ -96,7 +90,40 @@ where
 
 	fn import(&self, profile: Profile) -> Result<(), String>
 	{
-		todo!()
+		if self.is_backup_enabled
+		{
+			let backup_dir = self.db_dir.with_extension("bck");
+			copy_dir(&self.db_dir, &backup_dir)
+				.or(Err("Could not back up storage database of Chrome!".to_string()))?;
+		}
+
+		let mut db = (self.db_provider)(&self.db_dir)
+			.or(Err("Could not open storage database of Chrome!".to_string()))?;
+
+		let mut iter = db
+			.new_iter()
+			.or(Err("Could not iterate over database of Chrome!".to_string()))?;
+		
+		while let Some((key, _)) = iter.next()
+		{
+			if let Some(_) = try_parse_key(key.clone())?
+			{
+				db
+					.delete(&key)
+					.or(Err("Could not delete old entry in the database of Chrome!".to_string()))?;
+			}
+		}
+
+		for entry in profile.get_entries()
+		{
+			let key = "_https://guessthe.game\0\u{1}".to_string() + &entry.key;
+			let value = "\u{1}".to_string() + &entry.value;
+			db
+				.put(key.as_bytes(), value.as_bytes())
+				.or(Err("Could not add entry to the database of Chrome!"))?;
+		}
+
+		Ok(())
 	}
 }
 
@@ -116,4 +143,49 @@ pub fn get_chrome_dir() -> Result<Option<PathBuf>, String>
 		None
 	};
 	Ok(result)
+}
+
+fn copy_dir(source: &Path, destination: &Path) -> std::io::Result<()>
+{
+	fs::create_dir_all(destination)?;
+	for entry in fs::read_dir(source)?
+	{
+		let entry = entry?;
+		let path = entry.path();
+		let destination_path = destination.join(entry.file_name());
+		fs::copy(&path, &destination_path)?;
+	}
+	Ok(())
+}
+
+fn try_parse_key(key: Vec<u8>) -> Result<Option<String>, String>
+{
+	let key = String::from_utf8(key)
+		.or(Err("Could not parse a key as a string from the database of Chrome!".to_string()))?;
+
+	if let Some(key) = key.strip_prefix("_https://guessthe.game\0\u{1}")
+	{
+		let exclude_list = vec!["CMPList", "_cmpRepromptHash", "noniabvendorconsent"];
+		if !exclude_list.contains(&key)
+		{
+			return Ok(Some(key.to_string()));
+		}
+	}
+
+	return Ok(None);
+}
+
+fn try_parse_value(value: Vec<u8>) -> Option<String>
+{
+	let value = String::from_utf8(value);
+
+	if let Ok(value) = value
+	{
+		if let Some(value) = value.strip_prefix("\u{1}")
+		{
+			return Some(value.to_string());
+		}
+	}
+
+	return None;
 }
