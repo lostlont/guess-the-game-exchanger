@@ -15,6 +15,11 @@ mod tests
 				ProfileEntry,
 			},
 		},
+		crate::browser::tests::
+		{
+			INVALID_ENTRIES,
+			VALID_ENTRIES,
+		},
 	};
 
 	#[test]
@@ -103,12 +108,18 @@ Default = path/to/profile
 Default = path/to/profile
 "#;
 
-		let ok_blob = hex::encode("ok");
-		let fail_blob = hex::encode("fail");
-		let db_content = format!("
-insert into data values ('item1', 2, 1, 0, 0, X'{ok_blob}');
-insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
-");
+		let mut entries = std::iter::Iterator
+			::chain(
+				VALID_ENTRIES.iter(),
+				INVALID_ENTRIES.iter())
+			.collect::<Vec<_>>();
+		entries.sort();
+
+		let entries = entries
+			.iter()
+			.map(|(key, value)| insert_statement(key, value))
+			.collect::<Vec<_>>();
+		let db_content = entries.join("\n");
 
 		let firefox = Firefox::try_new(
 			&firefox_dir,
@@ -126,18 +137,18 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 			.cloned()
 			.collect::<Vec<_>>();
 
-		let expected = vec![
-			ProfileEntry
+		let mut expected = VALID_ENTRIES.clone();
+		expected.sort();
+
+		let expected = expected
+			.iter()
+			.map(|(key, value)| ProfileEntry
 			{
-				key:"item1".to_string(),
-				value: "ok".to_string(),
-			},
-			ProfileEntry
-			{
-				key:"item2".to_string(),
-				value: "fail".to_string(),
-			},
-		];
+				key: key.to_string(),
+				value: value.to_string(),
+			})
+			.collect::<Vec<_>>();
+
 		assert_eq!(
 			actual,
 			expected);
@@ -153,8 +164,10 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 Default = path/to/profile
 "#;
 
+		let db_content = insert_statement("existingkey", "existingvalue") + ";";
+
 		// The scope of the two connections should overlap.
-		let db = create_shared_db(None);
+		let db = create_shared_db(Some(&db_content));
 
 		let firefox = Firefox::try_new(
 			&firefox_dir,
@@ -163,19 +176,15 @@ Default = path/to/profile
 			false)
 			.unwrap();
 
-		let entries = vec![
-			ProfileEntry
+		let entries = VALID_ENTRIES
+			.iter()
+			.map(|(key, value)| ProfileEntry
 			{
-				key: "item1".to_string(),
-				value: "ok".to_string(),
-			},
-			ProfileEntry
-			{
-				key: "item2".to_string(),
-				value: "fail".to_string(),
-			},
-		];
-		let profile = Profile::from(entries.clone());
+				key: key.to_string(),
+				value: value.to_string(),
+			})
+			.collect::<Vec<_>>();
+		let profile = Profile::from(entries);
 
 		firefox
 			.import(profile)
@@ -203,20 +212,17 @@ Default = path/to/profile
 			.collect::<Result<Vec<_>, _>>()
 			.unwrap();
 
-		let expected = vec![
-			RawEntry
+		let expected = std::iter::Iterator
+			::chain(
+				vec![("existingkey", "existingvalue")].iter(),
+				VALID_ENTRIES.iter())
+			.map(|(key, value)| RawEntry
 			{
-				key: "item1".to_string(),
-				utf16_length: 2,
-				value: "ok".bytes().collect(),
-			},
-			RawEntry
-			{
-				key: "item2".to_string(),
-				utf16_length: 4,
-				value: "fail".bytes().collect(),
-			},
-		];
+				key: key.to_string(),
+				utf16_length: value.len() as i64,
+				value: value.bytes().collect(),
+			})
+			.collect::<Vec<_>>();
 		assert_eq!(actual, expected);
 	}
 
@@ -263,5 +269,12 @@ Default = path/to/profile
 		}
 		
 		Ok(db)
+	}
+
+	fn insert_statement(key: &str, value: &str) -> String
+	{
+		let length = value.len();
+		let value_blob = hex::encode(value);
+		format!("insert into data values ('{key}', '{length}', 1, 0, 0, X'{value_blob}');")
 	}
 }

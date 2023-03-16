@@ -29,6 +29,13 @@ use
 	super::Browser,
 };
 
+const FILTER : &str = "\
+key like '%_gamestate' \
+or key like '%_guess%' \
+or key in (\
+	'onefers', 'twofers', 'threefers', 'quads', 'fivers', 'sixers', \
+	'currentstreak', 'maxstreak', 'totalplayed', 'totalwon')";
+
 pub struct Firefox<TDbProvider, TError>
 where
 	TDbProvider: Fn(&Path) -> Result<Connection, TError>,
@@ -84,7 +91,8 @@ where
 		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
 
-		let mut statement = connection.prepare("select key, utf16_length, value from data")
+		let mut statement = connection
+			.prepare(&format!("select key, utf16_length, value from data where {FILTER}"))
 			.or(Err("Could not prepare select statement on database of Firefox!".to_string()))?;
 
 		struct RawEntry
@@ -127,7 +135,7 @@ where
 		let connection = (self.db_provider)(&self.db_path)
 			.or(Err("Could not open storage database file of Firefox!".to_string()))?;
 
-		let mut delete_statement = connection.prepare("delete from data")
+		let mut delete_statement = connection.prepare(&format!("delete from data where {FILTER}"))
 			.or(Err("Could not prepare delete statement on database of Firefox!".to_string()))?;
 
 		delete_statement
