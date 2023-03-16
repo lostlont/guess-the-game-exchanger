@@ -160,19 +160,30 @@ impl Application for App
 	{
 		let title = text("Guess The Game Exchanger")
 			.width(Length::Fill)
-			.size(24)
+			.size(28)
 			.horizontal_alignment(Horizontal::Center);
+
+		let create_gap = || row![].height(SPACING / 2);
+
 		let mut result = iced::widget::column![
+			create_gap(),
 			title,
+			create_gap(),
 		];
+
 		for view in self.browser_states
 			.iter()
 			.map(|bs| self.view_browser_state(bs))
 		{
+			let view = iced::widget::container(view)
+				.height(Length::Fill)
+				.center_y();
 			result = result.push(view);
 		}
+
 		result
 			.width(Length::Fill)
+			.height(Length::Fill)
 			.align_items(Alignment::Center)
 			.spacing(SPACING * 4)
 			.padding(PADDING * 4)
@@ -406,7 +417,7 @@ impl App
 			.width(Length::Fill)
 			.horizontal_alignment(Horizontal::Center)
 			.vertical_alignment(Vertical::Center)
-			.height(32)
+			.height(48)
 			.style(color)
 			.into()
 	}

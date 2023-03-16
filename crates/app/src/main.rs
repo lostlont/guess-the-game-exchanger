@@ -21,7 +21,7 @@ pub fn main() -> iced::Result
 	{
 		window: iced::window::Settings
 		{
-			size: (400, 320),
+			size: (360, 500),
 			resizable: false,
 			..Default::default()
 		},
