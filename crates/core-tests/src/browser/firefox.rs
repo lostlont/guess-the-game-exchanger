@@ -117,7 +117,8 @@ insert into data values ('item2', 4, 1, 0, 0, X'{fail_blob}');
 			false)
 			.unwrap();
 
-		let profile = firefox.export()
+		let profile = firefox
+			.export()
 			.unwrap();
 
 		let actual = profile

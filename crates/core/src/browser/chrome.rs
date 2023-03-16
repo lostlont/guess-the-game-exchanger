@@ -5,10 +5,15 @@ use
 		Path,
 		PathBuf,
 	},
+	rusty_leveldb::LdbIterator,
 	crate::
 	{
 		browser::Browser,
-		profile::Profile,
+		profile::
+		{
+			Profile,
+			ProfileEntry,
+		},
 	},
 };
 
@@ -52,16 +57,27 @@ where
 	{
 		let mut db = (self.db_provider)(&self.db_dir)
 			.or(Err("Could not open storage database of Chrome!".to_string()))?;
-		/*
-		let mut iter = db.new_iter().unwrap();
+
+		let mut iter = db
+			.new_iter()
+			.or(Err("Could not iterate over database of Chrome!".to_string()))?;
+		let mut entries = vec![];
 		while let Some((key, value)) = iter.next()
 		{
-			let key = String::from_utf8(key).unwrap_or("?".to_string());
-			let value = String::from_utf8(value).unwrap_or("?".to_string());
-			println!("{key:?}: {value:?}");
+			let key = String::from_utf8(key)
+				.or(Err("Could not parse a key as a string from the database of Chrome!".to_string()))?;
+			let value = String::from_utf8(value)
+				.or(Err("Could not parse a value as a string from the database of Chrome!".to_string()))?;
+			let entry = ProfileEntry
+			{
+				key,
+				value,
+			};
+			entries.push(entry);
 		}
-		*/
-		todo!()
+
+		let profile = Profile::from(entries);
+		Ok(profile)
 	}
 
 	fn import(&self, profile: Profile) -> Result<(), String>
